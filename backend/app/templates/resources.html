@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}资源库 · 资源库后台{% endblock %}
+{% block content %}
+<h1>资源库</h1>
+
+<div class="filters">
+  <a href="/resources" class="chip {{ 'on' if not current_status }}">全部</a>
+  {% for s in order %}
+  <a href="/resources?status={{ s }}" class="chip {{ 'on' if current_status==s }}">{{ labels[s] }}</a>
+  {% endfor %}
+</div>
+
+<div class="toolbar">
+  <label><input type="checkbox" id="select-all"> 全选</label>
+  <span id="sel-count" class="muted">已选 0 条</span>
+  <button id="btn-send" class="primary" disabled>批量发送去剪片</button>
+</div>
+
+{% if resources %}
+<table class="grid" id="res-table">
+  <thead>
+    <tr><th></th><th>ID</th><th>来源账号</th><th>类型</th><th>文案</th><th>状态</th><th>入库时间</th></tr>
+  </thead>
+  <tbody>
+  {% for r in resources %}
+    <tr>
+      <td><input type="checkbox" class="row-check" value="{{ r.id }}"></td>
+      <td>{{ r.id }}</td>
+      <td>{{ r.source_account or '—' }}</td>
+      <td>{{ r.media_type }}</td>
+      <td class="caption">{{ (r.caption or '')[:40] }}</td>
+      <td><span class="status status-{{ r.status }}">{{ labels[r.status] }}</span></td>
+      <td class="muted">{{ r.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">暂无资源。等爬虫通过接口入库后会显示在这里。</p>
+{% endif %}
+{% endblock %}

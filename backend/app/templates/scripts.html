@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}爬虫脚本 · 资源库后台{% endblock %}
+{% block content %}
+<h1>爬虫脚本</h1>
+
+<details class="addbox">
+  <summary>+ 登记新脚本</summary>
+  <form id="add-script">
+    <input name="name" placeholder="名称，如 IG 下载" required>
+    <input name="command" placeholder="命令，如 python3 ig_downloader.py --file usernames.txt --cookies cookies.json" required>
+    <input name="description" placeholder="说明（可选）">
+    <button type="submit" class="primary">保存</button>
+  </form>
+</details>
+
+{% if scripts %}
+<table class="grid">
+  <thead><tr><th>名称</th><th>命令</th><th>说明</th><th>状态</th><th>操作</th></tr></thead>
+  <tbody>
+  {% for sc in scripts %}
+    <tr>
+      <td>{{ sc.name }}</td>
+      <td><code>{{ sc.command }}</code></td>
+      <td>{{ sc.description or '—' }}</td>
+      <td>{% if sc.runs %}{{ sc.runs[0].status }}{% else %}未运行{% endif %}</td>
+      <td><button class="run-btn" data-id="{{ sc.id }}">运行</button></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">还没有脚本。展开上面的「登记新脚本」添加一个。</p>
+{% endif %}
+{% endblock %}

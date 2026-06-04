@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}概览 · 资源库后台{% endblock %}
+{% block content %}
+<h1>概览</h1>
+
+<section class="cards">
+  {% for s in order %}
+  <a class="card" href="/resources?status={{ s }}">
+    <div class="card-num">{{ counts[s] }}</div>
+    <div class="card-label">{{ labels[s] }}</div>
+  </a>
+  {% endfor %}
+</section>
+
+<h2>爬虫脚本</h2>
+{% if scripts %}
+<table class="grid">
+  <thead><tr><th>名称</th><th>命令</th><th>状态</th><th>最近运行</th></tr></thead>
+  <tbody>
+  {% for sc in scripts %}
+    <tr>
+      <td>{{ sc.name }}</td>
+      <td><code>{{ sc.command }}</code></td>
+      <td>{{ '启用' if sc.enabled else '停用' }}</td>
+      <td>{% if sc.runs %}{{ sc.runs[0].status }}{% else %}—{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">还没有登记爬虫脚本，去<a href="/scripts">爬虫脚本</a>页添加。</p>
+{% endif %}
+{% endblock %}

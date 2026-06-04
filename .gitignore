@@ -11,6 +11,11 @@ cookies.json
 # 爬取的媒体产物（体积大、可重生）
 downloads/
 
+# 后台运行时数据：SQLite 库 + 入库媒体
+backend/data/
+*.db
+*.sqlite3
+
 # Python
 __pycache__/
 *.pyc

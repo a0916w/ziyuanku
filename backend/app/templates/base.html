@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}资源库后台{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav class="topbar">
+    <span class="brand">资源库后台</span>
+    <a href="/" class="{{ 'on' if active=='dashboard' }}">概览</a>
+    <a href="/resources" class="{{ 'on' if active=='resources' }}">资源库</a>
+    <a href="/scripts" class="{{ 'on' if active=='scripts' }}">爬虫脚本</a>
+    <a href="/docs" class="right" target="_blank">API 文档</a>
+  </nav>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

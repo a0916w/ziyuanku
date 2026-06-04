@@ -5,6 +5,17 @@
 
 ## [Unreleased]
 
+### Added
+- 资源库后台 MVP 骨架（`backend/`，FastAPI + SQLAlchemy + SQLite + Jinja2）：
+  - **入库接口** `POST /api/resources`：单条/批量入库，按**文件哈希**去重（同一文件只入一次）。
+  - **资源库** `/resources`：网格列表 + 按状态筛选；多选后**批量发送去剪片**按钮。
+  - **批量发送** `POST /api/resources/batch-send`：下游剪片接口为 **stub** 占位（未配置 `ZIYUANKU_DISPATCH_ENDPOINT` 时仅本地推进状态），接口文档到位后在 `services/dispatch.py` 接真实调用。
+  - **爬虫脚本管理** `/scripts`：登记脚本、一键运行（子进程）、记录运行状态与日志。
+  - 资源状态机（四态）：未处理 → 已发送切片 → 切片完毕 → 已发送到项目。
+  - 概览页状态计数卡片、API 文档 `/docs`、健康检查 `/health`。
+  - 端到端冒烟测试通过：入库/去重/批量发送/状态推进/脚本登记/页面渲染/静态资源。
+- `.gitignore` 增加后台运行时数据（`backend/data/`、`*.db`）排除规则。
+
 ### Changed
 - 记录已确认的关键决策（2026-06-05）于 `资源库需求.md`：
   - 批量分发：通过下游接口发送，后台以按钮触发（接口文档待提供，先留对接位）。
