@@ -1,0 +1,23 @@
+# OS
+.DS_Store
+
+# 机密 — 绝不提交：IG 登录会话、令牌、环境变量
+cookies.json
+*.token
+*.pat
+.env
+.env.*
+
+# 爬取的媒体产物（体积大、可重生）
+downloads/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+
+# 安装器残留的空模板目录
+{output_folder}/

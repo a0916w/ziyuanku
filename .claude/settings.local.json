@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm -v)",
+      "Bash(npx -v)",
+      "Bash(npx bmad-method@latest install --help)",
+      "Bash(npx bmad-method@latest install --list-tools)",
+      "Bash(npx bmad-method@latest install --list-options)",
+      "Bash(npx bmad-method@latest install --directory /Users/wilsonong/Documents/GitHub/igcollect --modules bmm --tools claude-code --communication-language \"中文\" --document-output-language \"中文\" --yes)"
+    ]
+  }
+}
