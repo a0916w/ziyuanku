@@ -9,6 +9,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
@@ -56,6 +57,53 @@ app.include_router(sync.router)
 app.include_router(video_categories.router)
 
 
-@app.get("/health", tags=["meta"])
+@app.get("/health", tags=["meta"], include_in_schema=False)
 def health():
     return {"ok": True}
+
+
+def _collect_refs(node, acc: set[str]) -> None:
+    """递归收集 schema 里引用到的 components 名称。"""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == "$ref" and isinstance(value, str):
+                acc.add(value.rsplit("/", 1)[-1])
+            else:
+                _collect_refs(value, acc)
+    elif isinstance(node, list):
+        for item in node:
+            _collect_refs(item, acc)
+
+
+def custom_openapi():
+    """API 文档只暴露视频入库接口 POST /api/videos，其余接口照常工作但不在文档展示。"""
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
+
+    ingest = schema.get("paths", {}).get("/api/videos", {})
+    schema["paths"] = {"/api/videos": {"post": ingest["post"]}} if "post" in ingest else {}
+
+    # 仅保留入库接口引用到的 component schemas，保持文档干净
+    all_schemas = schema.get("components", {}).get("schemas", {})
+    if all_schemas:
+        needed: set[str] = set()
+        _collect_refs(schema["paths"], needed)
+        frontier = set(needed)
+        while frontier:
+            name = frontier.pop()
+            found: set[str] = set()
+            _collect_refs(all_schemas.get(name, {}), found)
+            new = found - needed
+            needed |= new
+            frontier |= new
+        schema["components"]["schemas"] = {
+            k: v for k, v in all_schemas.items() if k in needed
+        }
+
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = custom_openapi

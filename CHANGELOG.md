@@ -16,6 +16,7 @@
   - 数据库删除 `resources` 表。
 
 ### Changed
+- API 文档（`/docs` 与 `/openapi.json`）改为只暴露视频入库接口 `POST /api/videos`，其余接口仍正常工作但不在文档展示；并为入库请求体补充 sample 示例参数。
 - 视频库页面路由由 `/resources` 改名为 `/videos`（导航、首页、筛选方案等链接同步更新）；保留 `/resources → /videos` 的隐藏重定向，旧链接不失效。
 - 后端数据库改为仅支持 MySQL：
   - 移除 `backend/app/config.py` 中 SQLite 回退与本地 SQLite 自动迁移逻辑。
