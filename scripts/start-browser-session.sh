@@ -80,7 +80,7 @@ fi
 printf '%s\n' "$VNC_PASSWORD" | vncpasswd -f > "$VNC_AUTH_FILE"
 chmod 600 "$VNC_AUTH_FILE"
 
-if ! vncserver -list 2>/dev/null | awk '{print $1}' | grep -qx ":${DISPLAY_NUM}"; then
+if ! port_open 127.0.0.1 "$VNC_PORT"; then
   vncserver ":${DISPLAY_NUM}" -localhost yes -geometry "$VNC_GEOMETRY" -depth "$VNC_DEPTH" >"$LOG_DIR/vnc-start.log" 2>&1
 fi
 if ! port_open 127.0.0.1 "$VNC_PORT"; then

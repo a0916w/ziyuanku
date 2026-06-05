@@ -63,6 +63,12 @@
     pill.className = "status " + (ok ? "status-dl-done" : "status-dl-failed");
     pill.textContent = ok ? "CDP 可用" : "未启动";
     novnc.href = data.novnc_url || "#";
+    if (data.novnc_url && data.vnc_password) {
+      const link = new URL(data.novnc_url, window.location.origin);
+      link.searchParams.set("autoconnect", "true");
+      link.searchParams.set("password", data.vnc_password);
+      novnc.href = link.toString();
+    }
     if (data.vnc_password) {
       password.textContent = `VNC 密码：${data.vnc_password}`;
       password.classList.remove("hidden");
