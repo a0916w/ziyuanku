@@ -24,6 +24,29 @@ STATUS_ORDER = [
     STATUS_PENDING, STATUS_SENT_FOR_CLIP, STATUS_CLIP_DONE, STATUS_SENT_TO_PROJECT,
 ]
 
+# 脚本运行状态
+RUN_RUNNING = "running"
+RUN_SUCCESS = "success"
+RUN_FAILED = "failed"
+RUN_STATUS_LABELS = {
+    RUN_RUNNING: "运行中",
+    RUN_SUCCESS: "成功",
+    RUN_FAILED: "失败",
+}
+
+# 视频下载状态
+DL_PENDING = "pending"
+DL_DOWNLOADING = "downloading"
+DL_DONE = "done"
+DL_FAILED = "failed"
+DL_STATUS_LABELS = {
+    DL_PENDING: "待下载",
+    DL_DOWNLOADING: "下载中",
+    DL_DONE: "已完成",
+    DL_FAILED: "失败",
+}
+DL_STATUS_ORDER = [DL_PENDING, DL_DOWNLOADING, DL_DONE, DL_FAILED]
+
 
 class Resource(Base):
     __tablename__ = "resources"
@@ -44,6 +67,29 @@ class Resource(Base):
     sent_for_clip_at = Column(DateTime)
     clip_done_at = Column(DateTime)
     sent_to_project_at = Column(DateTime)
+
+
+class Video(Base):
+    """爬虫采集的视频元数据（封面、标题、流地址、本地文件等）。"""
+    __tablename__ = "videos"
+
+    id = Column(Integer, primary_key=True)
+    code = Column(String(128), index=True)              # 番号，优先作去重键
+    title = Column(String(512), nullable=False)
+    cover_url = Column(String(1024))                    # 封面图 URL
+    source_url = Column(String(1024), nullable=False, index=True)  # 详情页链接
+    duration = Column(String(32))
+    video_url = Column(String(2048))                    # 视频流地址（m3u8 等）
+    file_path = Column(String(1024))                    # 本地下载路径
+    download_status = Column(String(32), default=DL_PENDING, index=True)
+    download_progress = Column(Integer, default=0)        # 0–100
+    download_error = Column(Text)
+    downloaded_at = Column(DateTime)
+    source = Column(String(64), default="missav", index=True)  # 来源站点
+    extra = Column(JSON)
+
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class CrawlScript(Base):

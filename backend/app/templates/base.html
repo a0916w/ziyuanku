@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}资源库后台{% endblock %}</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=4">
 </head>
-<body>
+<body class="page-{{ active|default('') }}">
   <nav class="topbar">
     <span class="brand">资源库后台</span>
     <a href="/" class="{{ 'on' if active=='dashboard' }}">概览</a>
@@ -17,6 +17,8 @@
   <main>
     {% block content %}{% endblock %}
   </main>
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=4"></script>
+  {% if has_running is defined and has_running %}<script>window.__POLL_RUNS__ = true;</script>{% endif %}
+  {% if poll_downloads is defined and poll_downloads %}<script>window.__POLL_DOWNLOADS__ = true;</script>{% endif %}
 </body>
 </html>

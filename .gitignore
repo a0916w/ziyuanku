@@ -10,8 +10,12 @@ cookies.json
 
 # 爬取的媒体产物（体积大、可重生）
 downloads/
+/data/**
+!/data/metadata/
+!/data/metadata/**
+!/data/metadata/*.json
 
-# 后台运行时数据：SQLite 库 + 入库媒体
+# 后台运行时数据（旧路径，兼容）
 backend/data/
 *.db
 *.sqlite3

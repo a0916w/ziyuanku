@@ -1,34 +1,99 @@
 {% extends "base.html" %}
 {% block title %}爬虫脚本 · 资源库后台{% endblock %}
 {% block content %}
-<h1>爬虫脚本</h1>
+<h1>爬虫脚本管理</h1>
+<p class="muted">在后台登记、运行 <code>scrapers/</code> 下的爬虫；运行日志自动保存，下载类任务最长 24 小时。</p>
 
-<details class="addbox">
-  <summary>+ 登记新脚本</summary>
-  <form id="add-script">
-    <input name="name" placeholder="名称，如 IG 下载" required>
-    <input name="command" placeholder="命令，如 python3 ig_downloader.py --file usernames.txt --cookies cookies.json" required>
+<p class="toolbar">
+  <button type="button" id="btn-sync-scripts" class="primary">同步内置脚本</button>
+  <span class="muted">从 script_registry 更新 MissAV / Pornhub / IG 等预设命令</span>
+</p>
+
+<details class="addbox" id="script-form-box">
+  <summary id="form-summary">+ 登记新脚本</summary>
+  <form id="script-form">
+    <input type="hidden" name="id" value="">
+    <input name="name" placeholder="名称，如 MissAV 爬虫" required>
+    <input name="command" placeholder="命令，如 python3 scrapers/missav_scraper.py" required style="min-width:320px">
     <input name="description" placeholder="说明（可选）">
-    <button type="submit" class="primary">保存</button>
+    <label class="chk"><input type="checkbox" name="enabled" checked> 启用</label>
+    <button type="submit" class="primary" id="form-submit">保存</button>
+    <button type="button" class="hidden" id="form-cancel">取消编辑</button>
   </form>
 </details>
 
+<h2>脚本列表 <span class="muted">({{ scripts|length }})</span></h2>
 {% if scripts %}
-<table class="grid">
-  <thead><tr><th>名称</th><th>命令</th><th>说明</th><th>状态</th><th>操作</th></tr></thead>
+<table class="grid" id="scripts-table">
+  <thead>
+    <tr>
+      <th>名称</th><th>命令</th><th>说明</th><th>状态</th><th>最近运行</th><th>操作</th>
+    </tr>
+  </thead>
   <tbody>
   {% for sc in scripts %}
-    <tr>
-      <td>{{ sc.name }}</td>
-      <td><code>{{ sc.command }}</code></td>
-      <td>{{ sc.description or '—' }}</td>
-      <td>{% if sc.runs %}{{ sc.runs[0].status }}{% else %}未运行{% endif %}</td>
-      <td><button class="run-btn" data-id="{{ sc.id }}">运行</button></td>
+    {% set last = sc.runs[0] if sc.runs else none %}
+    {% set running = last and last.status == 'running' %}
+    <tr data-script-id="{{ sc.id }}" class="{{ 'row-running' if running else '' }}">
+      <td><strong>{{ sc.name }}</strong></td>
+      <td><code class="cmd-cell">{{ sc.command }}</code></td>
+      <td class="muted">{{ sc.description or '—' }}</td>
+      <td>
+        {% if not sc.enabled %}<span class="status status-dl-pending">已停用</span>
+        {% elif running %}<span class="status status-run-running">运行中</span>
+        {% else %}<span class="status status-dl-done">就绪</span>{% endif %}
+      </td>
+      <td>
+        {% if last %}
+        <span class="status status-run-{{ last.status }}">{{ run_labels.get(last.status, last.status) }}</span>
+        <span class="muted">{{ last.started_at.strftime('%m-%d %H:%M') if last.started_at else '' }}</span>
+        {% else %}<span class="muted">未运行</span>{% endif %}
+      </td>
+      <td class="actions">
+        <button class="run-btn" data-id="{{ sc.id }}"
+          {% if not sc.enabled or running %}disabled{% endif %}>运行</button>
+        <button class="edit-btn" data-id="{{ sc.id }}" {% if running %}disabled{% endif %}>编辑</button>
+        <button class="toggle-btn" data-id="{{ sc.id }}" data-enabled="{{ '1' if sc.enabled else '0' }}">
+          {{ '停用' if sc.enabled else '启用' }}
+        </button>
+        <button class="delete-btn" data-id="{{ sc.id }}" {% if running %}disabled{% endif %}>删除</button>
+      </td>
     </tr>
   {% endfor %}
   </tbody>
 </table>
 {% else %}
-<p class="muted">还没有脚本。展开上面的「登记新脚本」添加一个。</p>
+<p class="muted">还没有脚本。点击「同步内置脚本」导入预设，或手动登记。</p>
+{% endif %}
+
+<h2>运行记录</h2>
+<p class="muted" id="runs-hint">{% if has_running %}有脚本正在运行，页面将自动刷新…{% else %}点击「查看日志」展开输出{% endif %}</p>
+
+{% if recent_runs %}
+<table class="grid" id="runs-table">
+  <thead>
+    <tr><th>#</th><th>脚本</th><th>状态</th><th>开始</th><th>结束</th><th>退出码</th><th>日志</th></tr>
+  </thead>
+  <tbody>
+  {% for r in recent_runs %}
+    <tr data-run-id="{{ r.id }}">
+      <td>{{ r.id }}</td>
+      <td>{{ r.script.name if r.script else '—' }}</td>
+      <td><span class="status status-run-{{ r.status }}">{{ run_labels.get(r.status, r.status) }}</span></td>
+      <td>{{ r.started_at.strftime('%Y-%m-%d %H:%M:%S') if r.started_at else '—' }}</td>
+      <td>{{ r.finished_at.strftime('%Y-%m-%d %H:%M:%S') if r.finished_at else '—' }}</td>
+      <td>{{ r.exit_code if r.exit_code is not none else '—' }}</td>
+      <td>{% if r.log %}<button class="log-btn" data-log="{{ r.id }}">查看</button>{% else %}—{% endif %}</td>
+    </tr>
+    {% if r.log %}
+    <tr class="log-row hidden" id="log-{{ r.id }}">
+      <td colspan="7"><pre class="logbox">{{ r.log }}</pre></td>
+    </tr>
+    {% endif %}
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">暂无运行记录。</p>
 {% endif %}
 {% endblock %}

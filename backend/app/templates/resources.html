@@ -1,41 +1,77 @@
 {% extends "base.html" %}
 {% block title %}资源库 · 资源库后台{% endblock %}
 {% block content %}
-<h1>资源库</h1>
+<h1>资源库{% if total is defined %} <span class="muted" style="font-size:14px;font-weight:normal">共 {{ total }} 条</span>{% endif %}</h1>
+
+<section class="cards">
+  {% for s in dl_order %}
+  <a class="card" href="/resources?download_status={{ s }}">
+    <div class="card-num">{{ dl_counts[s] }}</div>
+    <div class="card-label">{{ dl_labels[s] }}</div>
+  </a>
+  {% endfor %}
+</section>
 
 <div class="filters">
-  <a href="/resources" class="chip {{ 'on' if not current_status }}">全部</a>
-  {% for s in order %}
-  <a href="/resources?status={{ s }}" class="chip {{ 'on' if current_status==s }}">{{ labels[s] }}</a>
+  <a class="chip {{ 'on' if not current_dl_status }}" href="/resources">全部</a>
+  {% for s in dl_order %}
+  <a class="chip {{ 'on' if current_dl_status==s }}" href="/resources?download_status={{ s }}">{{ dl_labels[s] }}</a>
   {% endfor %}
 </div>
 
-<div class="toolbar">
-  <label><input type="checkbox" id="select-all"> 全选</label>
-  <span id="sel-count" class="muted">已选 0 条</span>
-  <button id="btn-send" class="primary" disabled>批量发送去剪片</button>
-</div>
-
-{% if resources %}
-<table class="grid" id="res-table">
-  <thead>
-    <tr><th></th><th>ID</th><th>来源账号</th><th>类型</th><th>文案</th><th>状态</th><th>入库时间</th></tr>
-  </thead>
-  <tbody>
-  {% for r in resources %}
-    <tr>
-      <td><input type="checkbox" class="row-check" value="{{ r.id }}"></td>
-      <td>{{ r.id }}</td>
-      <td>{{ r.source_account or '—' }}</td>
-      <td>{{ r.media_type }}</td>
-      <td class="caption">{{ (r.caption or '')[:40] }}</td>
-      <td><span class="status status-{{ r.status }}">{{ labels[r.status] }}</span></td>
-      <td class="muted">{{ r.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-    </tr>
+{% if items %}
+<ul class="res-list" id="res-grid">
+  {% for item in items %}
+  {% set v = item.v %}
+  <li class="res-card"
+      data-id="{{ v.id }}"
+      data-status="{{ v.download_status or 'pending' }}"
+      data-progress="{{ item.progress }}"
+      data-indeterminate="{{ '1' if item.indeterminate else '0' }}">
+    <div class="res-cover-wrap">
+      <div class="res-preview" role="button" tabindex="0"
+           data-url="{{ item.play_url }}" data-type="video"
+           data-cover="{{ item.cover_url or '' }}">
+        {% if item.cover_url %}
+        <img src="{{ item.cover_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">
+        {% elif item.has_file %}
+        <div class="res-missing">无封面</div>
+        {% else %}
+        <div class="res-missing">无预览</div>
+        {% endif %}
+        {% if item.has_file %}<span class="res-play">▶</span>{% endif %}
+      </div>
+      <div class="res-progress-wrap">
+        <div class="res-progress-track status-dl-{{ v.download_status or 'pending' }}">
+          <div class="res-progress-fill" style="width: {{ item.progress }}%"></div>
+          {% if item.indeterminate %}<div class="res-progress-indeterminate"></div>{% endif %}
+        </div>
+        <div class="res-progress-text">
+          <span class="res-progress-label">{{ item.status_label }}</span>
+          <span class="res-progress-pct">{% if item.indeterminate %}…{% else %}{{ item.progress }}%{% endif %}</span>
+        </div>
+      </div>
+    </div>
+    <div class="res-meta">
+      <div class="res-caption" title="{{ v.title }}">{{ v.title }}</div>
+      <div class="res-foot muted">
+        <span>{{ v.code or '—' }}</span>
+        <span>{{ v.source }}</span>
+        {% if v.duration %}<span>{{ v.duration }}</span>{% endif %}
+        {% if v.source_url %}
+        <a href="{{ v.source_url }}" target="_blank" rel="noopener" onclick="event.stopPropagation()">原页</a>
+        {% endif %}
+      </div>
+    </div>
+  </li>
   {% endfor %}
-  </tbody>
-</table>
+</ul>
 {% else %}
-<p class="muted">暂无资源。等爬虫通过接口入库后会显示在这里。</p>
+<p class="muted">暂无资源。运行爬虫后 <code>POST /api/videos</code> 入库，或点<a href="/">概览</a>「同步本地 data/」。</p>
 {% endif %}
+
+<div id="lightbox" class="lightbox hidden" aria-hidden="true">
+  <button type="button" class="lightbox-close" aria-label="关闭">×</button>
+  <div class="lightbox-body"></div>
+</div>
 {% endblock %}
