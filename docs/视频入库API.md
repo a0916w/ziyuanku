@@ -2,8 +2,8 @@
 
 把爬虫/外部采集到的视频信息写入资源库。接口已内置去重，可单条或批量提交。
 
-> 入库能力由后端 `POST /api/videos` 提供（见 `backend/app/routers/videos.py`），
-> 本文档描述其请求/响应契约，以及配套的查询、状态更新接口，并附完整示例。
+> 入库能力由后端 `POST /api/videos` 提供（见 `backend/app/routers/videos.py`）。
+> 本文档只描述视频入库接口。
 
 ---
 
@@ -11,13 +11,9 @@
 
 - [1. 接入地址与鉴权](#1-接入地址与鉴权)
 - [2. 视频入库 `POST /api/videos`](#2-视频入库-post-apivideos)
-- [3. 视频列表 `GET /api/videos`](#3-视频列表-get-apivideos)
-- [4. 视频详情 `GET /api/videos/{id}`](#4-视频详情-get-apivideosid)
-- [5. 下载状态统计 `GET /api/videos/stats`](#5-下载状态统计-get-apivideosstats)
-- [6. 更新下载状态 `PATCH /api/videos/{id}/download`](#6-更新下载状态-patch-apivideosiddownload)
-- [7. 字段与枚举参考](#7-字段与枚举参考)
-- [8. 集成示例（Python / Shell）](#8-集成示例python--shell)
-- [9. 错误码与错误响应](#9-错误码与错误响应)
+- [3. 字段与枚举参考](#3-字段与枚举参考)
+- [4. 集成示例（Python / Shell）](#4-集成示例python--shell)
+- [5. 错误码与错误响应](#5-错误码与错误响应)
 
 ---
 
@@ -41,7 +37,7 @@ curl -u admin:lU7qNS8goKMHRWQx10q4N6P http://13.212.221.77/api/videos
 未带或带错鉴权会返回 `401`：
 
 ```bash
-curl -i http://13.212.221.77/api/videos
+curl -i -X POST http://13.212.221.77/api/videos
 # HTTP/1.1 401 Unauthorized
 # WWW-Authenticate: Basic realm="restricted"
 ```
@@ -180,7 +176,7 @@ curl -X POST http://127.0.0.1:8000/api/videos \
 
 ### 2.7 示例：入库即标记为已下载
 
-`file_path` 指向的文件存在时，自动置为 `done`：
+`file_path` 指向的文件存在时，自动置为 `done`、进度 100：
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/videos \
@@ -193,8 +189,6 @@ curl -X POST http://127.0.0.1:8000/api/videos \
   }'
 ```
 
-随后用详情接口查看，可见 `download_status` 为 `done`、`download_progress` 为 `100`。
-
 ### 2.8 示例：公网调用（带 Basic Auth）
 
 ```bash
@@ -206,245 +200,22 @@ curl -X POST http://13.212.221.77/api/videos \
 
 ---
 
-## 3. 视频列表 `GET /api/videos`
+## 3. 字段与枚举参考
 
-### 3.1 查询参数（均可选）
-
-| 参数 | 类型 | 默认 | 说明 |
-|------|------|------|------|
-| `source` | string | — | 按来源站点过滤 |
-| `download_status` | string | — | 按下载状态过滤（`pending`/`downloading`/`done`/`failed`） |
-| `category_id` | int | — | 按内容分类过滤（传一级分类则含其所有子分类） |
-| `uncategorized` | bool | `false` | 仅未分类 |
-| `keyword` | string | — | 标题/番号/链接模糊搜索 |
-| `trash_only` | bool | `false` | 仅回收站（软删除项） |
-| `limit` | int | `200` | 返回条数上限 |
-
-### 3.2 示例
-
-请求：
-
-```bash
-curl "http://127.0.0.1:8000/api/videos?source=missav&download_status=pending&limit=2"
-```
-
-响应 `200`（`VideoOut` 数组）：
-
-```json
-[
-  {
-    "id": 14,
-    "code": "BBB-002",
-    "title": "片名 B",
-    "cover_url": null,
-    "cover_path": null,
-    "cover_clean_path": null,
-    "source_url": "https://example.com/b",
-    "duration": null,
-    "video_url": null,
-    "file_path": null,
-    "download_status": "pending",
-    "download_status_label": "待下载",
-    "download_progress": 0,
-    "download_error": null,
-    "downloaded_at": null,
-    "source": "missav",
-    "extra": null,
-    "created_at": "2026-06-05T12:05:00",
-    "updated_at": "2026-06-05T12:05:00"
-  },
-  {
-    "id": 13,
-    "code": "AAA-001",
-    "title": "片名 A",
-    "cover_url": "https://example.com/a.jpg",
-    "cover_path": null,
-    "cover_clean_path": null,
-    "source_url": "https://example.com/a",
-    "duration": null,
-    "video_url": null,
-    "file_path": null,
-    "download_status": "pending",
-    "download_status_label": "待下载",
-    "download_progress": 0,
-    "download_error": null,
-    "downloaded_at": null,
-    "source": "missav",
-    "extra": null,
-    "created_at": "2026-06-05T12:05:00",
-    "updated_at": "2026-06-05T12:05:00"
-  }
-]
-```
-
----
-
-## 4. 视频详情 `GET /api/videos/{id}`
-
-请求：
-
-```bash
-curl http://127.0.0.1:8000/api/videos/12
-```
-
-响应 `200`（单个 `VideoOut`）：
-
-```json
-{
-  "id": 12,
-  "code": "ABC-123",
-  "title": "示例标题",
-  "cover_url": "https://example.com/abc-123.jpg",
-  "cover_path": null,
-  "cover_clean_path": null,
-  "source_url": "https://example.com/abc-123",
-  "duration": "00:18:00",
-  "video_url": null,
-  "file_path": null,
-  "download_status": "pending",
-  "download_status_label": "待下载",
-  "download_progress": 0,
-  "download_error": null,
-  "downloaded_at": null,
-  "source": "missav",
-  "extra": null,
-  "created_at": "2026-06-05T12:00:00",
-  "updated_at": "2026-06-05T12:00:00"
-}
-```
-
-不存在时返回 `404`：
-
-```json
-{ "detail": "视频不存在" }
-```
-
----
-
-## 5. 下载状态统计 `GET /api/videos/stats`
-
-请求：
-
-```bash
-curl http://127.0.0.1:8000/api/videos/stats
-```
-
-响应 `200`：
-
-```json
-{
-  "counts": { "pending": 10, "downloading": 1, "done": 5, "failed": 0 },
-  "labels": { "pending": "待下载", "downloading": "下载中", "done": "已完成", "failed": "失败" },
-  "order": ["pending", "downloading", "done", "failed"]
-}
-```
-
----
-
-## 6. 更新下载状态 `PATCH /api/videos/{id}/download`
-
-下载器在下载过程中/完成后回写状态。
-
-### 6.1 请求字段
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `download_status` | string | 是 | `pending` / `downloading` / `done` / `failed` |
-| `download_progress` | int | 否 | 0–100 |
-| `file_path` | string | 否 | 本地文件路径 |
-| `video_url` | string | 否 | 视频流地址 |
-| `download_error` | string | 否 | 失败原因 |
-
-行为：置为 `done` 时自动把进度补到 100、记录 `downloaded_at`、清空 `download_error`；置为 `pending` 时进度归 0。
-
-### 6.2 示例：标记下载完成
-
-请求：
-
-```bash
-curl -X PATCH http://127.0.0.1:8000/api/videos/12/download \
-  -H "Content-Type: application/json" \
-  -d '{
-    "download_status": "done",
-    "file_path": "/home/ziyuanku/data/media/abc-123.mp4",
-    "video_url": "https://cdn.example.com/abc-123/index.m3u8"
-  }'
-```
-
-响应 `200`（更新后的 `VideoOut`，节选）：
-
-```json
-{
-  "id": 12,
-  "code": "ABC-123",
-  "download_status": "done",
-  "download_status_label": "已完成",
-  "download_progress": 100,
-  "file_path": "/home/ziyuanku/data/media/abc-123.mp4",
-  "video_url": "https://cdn.example.com/abc-123/index.m3u8",
-  "downloaded_at": "2026-06-05T12:30:00",
-  "download_error": null
-}
-```
-
-### 6.3 示例：标记下载中（带进度）
-
-```bash
-curl -X PATCH http://127.0.0.1:8000/api/videos/12/download \
-  -H "Content-Type: application/json" \
-  -d '{"download_status": "downloading", "download_progress": 45}'
-```
-
-### 6.4 示例：标记失败
-
-```bash
-curl -X PATCH http://127.0.0.1:8000/api/videos/12/download \
-  -H "Content-Type: application/json" \
-  -d '{"download_status": "failed", "download_error": "源站 403，无法下载"}'
-```
-
----
-
-## 7. 字段与枚举参考
-
-### 7.1 下载状态 `download_status`
+### 3.1 下载状态 `download_status`
 
 | 值 | 标签 | 含义 |
 |----|------|------|
 | `pending` | 待下载 | 默认状态 |
 | `downloading` | 下载中 | 进度 0–100 |
 | `done` | 已完成 | 进度自动置 100 |
-| `failed` | 失败 | `download_error` 记录原因 |
-
-### 7.2 视频对象 `VideoOut`（响应）
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `id` | int | 主键 |
-| `code` | string \| null | 番号 |
-| `title` | string | 标题 |
-| `cover_url` | string \| null | 封面远程 URL |
-| `cover_path` | string \| null | 封面本地原图路径 |
-| `cover_clean_path` | string \| null | 去水印后封面路径 |
-| `source_url` | string | 详情页链接 |
-| `duration` | string \| null | 时长 |
-| `video_url` | string \| null | 视频流地址 |
-| `file_path` | string \| null | 本地下载路径 |
-| `download_status` | string | 下载状态值 |
-| `download_status_label` | string | 下载状态中文标签 |
-| `download_progress` | int | 0–100 |
-| `download_error` | string \| null | 失败原因 |
-| `downloaded_at` | datetime \| null | 完成时间（UTC ISO8601） |
-| `source` | string | 来源站点 |
-| `extra` | object \| null | 自定义元数据 |
-| `created_at` | datetime | 创建时间 |
-| `updated_at` | datetime \| null | 更新时间 |
+| `failed` | 失败 | 记录失败原因 |
 
 ---
 
-## 8. 集成示例（Python / Shell）
+## 4. 集成示例（Python / Shell）
 
-### 8.1 Python：爬虫批量入库
+### 4.1 Python：爬虫批量入库
 
 ```python
 import requests
@@ -456,7 +227,7 @@ BASE = "http://127.0.0.1:8000"          # 服务器本机直连，无需鉴权
 AUTH = None
 
 def ingest(items: list[dict]) -> dict:
-    """批量入库，items 为 VideoIn 字段组成的字典列表。"""
+    """批量入库，items 为入库字段组成的字典列表。"""
     resp = requests.post(f"{BASE}/api/videos", json=items, auth=AUTH, timeout=30)
     resp.raise_for_status()
     return resp.json()
@@ -481,45 +252,22 @@ result = ingest(videos)
 print(result)   # {'created': 2, 'duplicated': 0, 'ids': [13, 14]}
 ```
 
-### 8.2 Python：下载完成后回写状态
-
-```python
-import requests
-
-BASE = "http://127.0.0.1:8000"
-
-def mark_done(video_id: int, file_path: str, video_url: str | None = None):
-    payload = {"download_status": "done", "file_path": file_path}
-    if video_url:
-        payload["video_url"] = video_url
-    resp = requests.patch(f"{BASE}/api/videos/{video_id}/download", json=payload, timeout=30)
-    resp.raise_for_status()
-    return resp.json()
-
-mark_done(12, "/home/ziyuanku/data/media/abc-123.mp4")
-```
-
-### 8.3 Shell：单条入库 + 查询验证
+### 4.2 Shell：单条入库
 
 ```bash
-# 入库
 curl -s -X POST http://127.0.0.1:8000/api/videos \
   -H "Content-Type: application/json" \
   -d '{"title":"shell 示例","code":"SH-001","url":"https://example.com/sh-001"}'
-
-# 按关键字查询验证
-curl -s "http://127.0.0.1:8000/api/videos?keyword=SH-001"
 ```
 
 ---
 
-## 9. 错误码与错误响应
+## 5. 错误码与错误响应
 
 | 状态码 | 场景 | 响应体示例 |
 |--------|------|------------|
-| `200` | 成功 | 见各接口 |
+| `200` | 成功 | 见上文各示例 |
 | `401` | 公网入口未带/带错 Basic Auth | （由 Caddy 返回，非 JSON） |
-| `404` | 指定视频不存在（详情/更新下载状态） | `{ "detail": "视频不存在" }` |
 | `422` | 请求体校验失败 | 见下 |
 
 `422` 示例：缺少 `source_url`/`url` 时
