@@ -38,11 +38,25 @@ def _migrate_sqlite_columns():
         alters.append("ALTER TABLE videos ADD COLUMN downloaded_at DATETIME")
     if "download_progress" not in existing:
         alters.append("ALTER TABLE videos ADD COLUMN download_progress INTEGER DEFAULT 0")
+    if "cover_path" not in existing:
+        alters.append("ALTER TABLE videos ADD COLUMN cover_path VARCHAR(1024)")
+    if "cover_clean_path" not in existing:
+        alters.append("ALTER TABLE videos ADD COLUMN cover_clean_path VARCHAR(1024)")
     if not alters:
-        return
-    with engine.begin() as conn:
-        for sql in alters:
-            conn.execute(text(sql))
+        pass
+    else:
+        with engine.begin() as conn:
+            for sql in alters:
+                conn.execute(text(sql))
+
+    if "crawl_scripts" in insp.get_table_names():
+        script_cols = {c["name"] for c in insp.get_columns("crawl_scripts")}
+        if "category_id" not in script_cols:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "ALTER TABLE crawl_scripts ADD COLUMN category_id INTEGER "
+                    "REFERENCES script_categories(id)"
+                ))
 
 
 def init_db():

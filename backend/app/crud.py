@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from . import models
@@ -129,10 +129,14 @@ def ingest_video(db: Session, payload: VideoIn) -> tuple[models.Video, bool]:
                 existing.downloaded_at = datetime.utcnow()
                 existing.download_error = None
                 changed = True
-        for attr in ("title", "cover_url", "video_url", "duration"):
+        for attr in ("title", "cover_url", "cover_path", "video_url", "duration"):
             val = getattr(payload, attr, None)
             if val and getattr(existing, attr) != val:
                 setattr(existing, attr, val)
+                changed = True
+        if payload.cover_path and Path(payload.cover_path).is_file():
+            if existing.cover_path != payload.cover_path:
+                existing.cover_path = payload.cover_path
                 changed = True
         if changed:
             db.commit()
@@ -145,6 +149,7 @@ def ingest_video(db: Session, payload: VideoIn) -> tuple[models.Video, bool]:
         code=payload.code,
         title=payload.title,
         cover_url=payload.cover_url,
+        cover_path=payload.cover_path,
         source_url=payload.source_url,
         duration=payload.duration,
         video_url=payload.video_url,
@@ -162,25 +167,116 @@ def ingest_video(db: Session, payload: VideoIn) -> tuple[models.Video, bool]:
 
 
 def count_videos(db: Session, source: Optional[str] = None,
-                 download_status: Optional[str] = None) -> int:
+                 download_status: Optional[str] = None,
+                 category_id: Optional[int] = None,
+                 uncategorized: bool = False,
+                 keyword: Optional[str] = None,
+                 trash_only: bool = False) -> int:
     from sqlalchemy import func
     stmt = select(func.count()).select_from(models.Video)
     if source:
         stmt = stmt.where(models.Video.source == source)
     if download_status:
         stmt = stmt.where(models.Video.download_status == download_status)
-    return db.execute(stmt).scalar_one()
+    if keyword:
+        kw = f"%{keyword.strip()}%"
+        stmt = stmt.where(
+            models.Video.title.ilike(kw)
+            | models.Video.code.ilike(kw)
+            | models.Video.source_url.ilike(kw)
+        )
+    if uncategorized:
+        stmt = stmt.where(~models.Video.content_categories.any())
+    elif category_id is not None:
+        cat = db.get(models.VideoCategory, category_id)
+        if cat and not cat.parent_id:
+            child_ids = [c.id for c in cat.children]
+            if child_ids:
+                stmt = stmt.where(models.Video.content_categories.any(
+                    models.VideoCategory.id.in_(child_ids)
+                ))
+            else:
+                return 0
+        else:
+            stmt = stmt.where(models.Video.content_categories.any(
+                models.VideoCategory.id == category_id
+            ))
+    # deleted 标记放在 extra，为兼容 SQLite/MySQL 的 JSON 方言差异，这里用 Python 二次过滤
+    if not trash_only:
+        if source or download_status or category_id is not None or uncategorized or keyword:
+            rows = list_videos(
+                db,
+                source=source,
+                download_status=download_status,
+                category_id=category_id,
+                uncategorized=uncategorized,
+                keyword=keyword,
+                trash_only=False,
+                limit=1000000,
+                offset=0,
+            )
+            return len(rows)
+        rows = list_videos(db, trash_only=False, limit=1000000, offset=0)
+        return len(rows)
+    rows = list_videos(
+        db,
+        source=source,
+        download_status=download_status,
+        category_id=category_id,
+        uncategorized=uncategorized,
+        keyword=keyword,
+        trash_only=True,
+        limit=1000000,
+        offset=0,
+    )
+    return len(rows)
 
 
 def list_videos(db: Session, source: Optional[str] = None,
-                download_status: Optional[str] = None, limit: int = 200):
+                download_status: Optional[str] = None,
+                category_id: Optional[int] = None,
+                uncategorized: bool = False,
+                keyword: Optional[str] = None,
+                trash_only: bool = False,
+                limit: int = 100, offset: int = 0,
+                load_categories: bool = False):
     stmt = select(models.Video).order_by(models.Video.created_at.desc())
+    if load_categories:
+        stmt = stmt.options(joinedload(models.Video.content_categories))
     if source:
         stmt = stmt.where(models.Video.source == source)
     if download_status:
         stmt = stmt.where(models.Video.download_status == download_status)
-    stmt = stmt.limit(limit)
-    return list(db.execute(stmt).scalars().all())
+    if keyword:
+        kw = f"%{keyword.strip()}%"
+        stmt = stmt.where(
+            models.Video.title.ilike(kw)
+            | models.Video.code.ilike(kw)
+            | models.Video.source_url.ilike(kw)
+        )
+    if uncategorized:
+        stmt = stmt.where(~models.Video.content_categories.any())
+    elif category_id is not None:
+        cat = db.get(models.VideoCategory, category_id)
+        if cat and not cat.parent_id:
+            child_ids = [c.id for c in cat.children]
+            if child_ids:
+                stmt = stmt.where(models.Video.content_categories.any(
+                    models.VideoCategory.id.in_(child_ids)
+                ))
+            else:
+                stmt = stmt.where(models.Video.id < 0)
+        else:
+            stmt = stmt.where(models.Video.content_categories.any(
+                models.VideoCategory.id == category_id
+            ))
+    rows = list(db.execute(stmt).scalars().unique().all())
+    def _is_deleted(v: models.Video) -> bool:
+        return bool((v.extra or {}).get("deleted", False))
+
+    rows = [v for v in rows if (_is_deleted(v) if trash_only else not _is_deleted(v))]
+    rows = rows[max(0, offset): max(0, offset) + limit]
+    return rows
 
 
 def counts_video_download(db: Session) -> dict[str, int]:
@@ -219,6 +315,65 @@ def update_video_download(db: Session, video_id: int, *,
     return video
 
 
+def update_video_cover(db: Session, video_id: int, *,
+                       cover_path: Optional[str] = None,
+                       cover_clean_path: Optional[str] = None) -> Optional[models.Video]:
+    """更新封面图本地路径（原图 / 去水印图）。"""
+    video = db.get(models.Video, video_id)
+    if not video:
+        return None
+    if cover_path is not None:
+        video.cover_path = cover_path
+    if cover_clean_path is not None:
+        video.cover_clean_path = cover_clean_path
+    db.commit()
+    db.refresh(video)
+    return video
+
+
+def soft_delete_videos(db: Session, ids: list[int]) -> int:
+    done = 0
+    for vid in ids:
+        v = db.get(models.Video, vid)
+        if not v:
+            continue
+        extra = dict(v.extra or {})
+        extra["deleted"] = True
+        extra["deleted_at"] = datetime.utcnow().isoformat()
+        v.extra = extra
+        done += 1
+    db.commit()
+    return done
+
+
+def restore_videos(db: Session, ids: list[int]) -> int:
+    done = 0
+    for vid in ids:
+        v = db.get(models.Video, vid)
+        if not v:
+            continue
+        extra = dict(v.extra or {})
+        if extra.get("deleted"):
+            extra["deleted"] = False
+            extra.pop("deleted_at", None)
+            v.extra = extra
+            done += 1
+    db.commit()
+    return done
+
+
+def purge_videos(db: Session, ids: list[int]) -> int:
+    done = 0
+    for vid in ids:
+        v = db.get(models.Video, vid)
+        if not v:
+            continue
+        db.delete(v)
+        done += 1
+    db.commit()
+    return done
+
+
 def list_recent_runs(db: Session, limit: int = 30) -> list[models.CrawlRun]:
     stmt = (
         select(models.CrawlRun)
@@ -238,21 +393,105 @@ def has_running_scripts(db: Session) -> bool:
     return row is not None
 
 
+# ---- 脚本分类 ----
+
+def list_script_categories(db: Session) -> list[models.ScriptCategory]:
+    stmt = (
+        select(models.ScriptCategory)
+        .order_by(models.ScriptCategory.sort_order, models.ScriptCategory.name)
+    )
+    return list(db.execute(stmt).scalars().all())
+
+
+def get_script_category(db: Session, category_id: int) -> Optional[models.ScriptCategory]:
+    return db.get(models.ScriptCategory, category_id)
+
+
+def get_script_category_by_name(db: Session, name: str) -> Optional[models.ScriptCategory]:
+    return db.execute(
+        select(models.ScriptCategory).where(models.ScriptCategory.name == name)
+    ).scalar_one_or_none()
+
+
+def create_script_category(
+    db: Session, name: str, description: str = None, sort_order: int = 0,
+) -> models.ScriptCategory:
+    cat = models.ScriptCategory(name=name, description=description, sort_order=sort_order)
+    db.add(cat)
+    db.commit()
+    db.refresh(cat)
+    return cat
+
+
+def upsert_script_category(
+    db: Session, name: str, description: str = None, sort_order: int = 0,
+) -> tuple[models.ScriptCategory, bool]:
+    existing = get_script_category_by_name(db, name)
+    if existing:
+        if description is not None:
+            existing.description = description
+        existing.sort_order = sort_order
+        db.commit()
+        db.refresh(existing)
+        return existing, False
+    return create_script_category(db, name, description, sort_order), True
+
+
+def update_script_category(db: Session, category: models.ScriptCategory, **fields) -> models.ScriptCategory:
+    for key, value in fields.items():
+        if value is not None and hasattr(category, key):
+            setattr(category, key, value)
+    db.commit()
+    db.refresh(category)
+    return category
+
+
+def delete_script_category(db: Session, category: models.ScriptCategory) -> None:
+    for script in list(category.scripts):
+        script.category_id = None
+    db.delete(category)
+    db.commit()
+
+
+def count_scripts_in_category(db: Session, category_id: int) -> int:
+    return db.execute(
+        select(func.count()).select_from(models.CrawlScript).where(
+            models.CrawlScript.category_id == category_id
+        )
+    ).scalar_one()
+
+
+def count_uncategorized_scripts(db: Session) -> int:
+    return db.execute(
+        select(func.count()).select_from(models.CrawlScript).where(
+            models.CrawlScript.category_id.is_(None)
+        )
+    ).scalar_one()
+
+
 # ---- 爬虫脚本 ----
 
-def list_scripts(db: Session):
+def list_scripts(db: Session, category_id: int | None = None):
     stmt = (
         select(models.CrawlScript)
-        .options(joinedload(models.CrawlScript.runs))
+        .options(
+            joinedload(models.CrawlScript.runs),
+            joinedload(models.CrawlScript.category),
+        )
         .order_by(models.CrawlScript.created_at.desc())
     )
+    if category_id is not None:
+        stmt = stmt.where(models.CrawlScript.category_id == category_id)
     return list(db.execute(stmt).scalars().unique().all())
 
 
 def get_script(db: Session, script_id: int) -> Optional[models.CrawlScript]:
     stmt = (
         select(models.CrawlScript)
-        .options(joinedload(models.CrawlScript.runs))
+        .options(
+            joinedload(models.CrawlScript.runs),
+            joinedload(models.CrawlScript.category),
+        )
         .where(models.CrawlScript.id == script_id)
     )
     return db.execute(stmt).scalars().unique().one_or_none()
@@ -264,33 +503,49 @@ def get_script_by_name(db: Session, name: str) -> Optional[models.CrawlScript]:
     ).scalar_one_or_none()
 
 
-def create_script(db: Session, name: str, command: str,
-                  description: str = None, enabled: bool = True) -> models.CrawlScript:
-    s = models.CrawlScript(name=name, command=command,
-                           description=description, enabled=enabled)
+def create_script(
+    db: Session,
+    name: str,
+    command: str,
+    description: str = None,
+    enabled: bool = True,
+    category_id: int | None = None,
+) -> models.CrawlScript:
+    s = models.CrawlScript(
+        name=name, command=command, description=description,
+        enabled=enabled, category_id=category_id,
+    )
     db.add(s)
     db.commit()
     db.refresh(s)
     return s
 
 
-def upsert_script(db: Session, name: str, command: str,
-                  description: str = None, enabled: bool = True) -> tuple[models.CrawlScript, bool]:
+def upsert_script(
+    db: Session,
+    name: str,
+    command: str,
+    description: str = None,
+    enabled: bool = True,
+    category_id: int | None = None,
+) -> tuple[models.CrawlScript, bool]:
     """按名称登记脚本。返回 (script, created)。"""
     existing = get_script_by_name(db, name)
     if existing:
         existing.command = command
         existing.description = description
         existing.enabled = enabled
+        if category_id is not None:
+            existing.category_id = category_id
         db.commit()
         db.refresh(existing)
         return existing, False
-    return create_script(db, name, command, description, enabled), True
+    return create_script(db, name, command, description, enabled, category_id), True
 
 
 def update_script(db: Session, script: models.CrawlScript, **fields) -> models.CrawlScript:
     for key, value in fields.items():
-        if value is not None and hasattr(script, key):
+        if hasattr(script, key):
             setattr(script, key, value)
     db.commit()
     db.refresh(script)
@@ -300,6 +555,148 @@ def update_script(db: Session, script: models.CrawlScript, **fields) -> models.C
 def delete_script(db: Session, script: models.CrawlScript) -> None:
     db.delete(script)
     db.commit()
+
+
+# ---- 视频内容分类 ----
+
+def list_video_categories(db: Session, *, roots_only: bool = False) -> list[models.VideoCategory]:
+    stmt = select(models.VideoCategory).order_by(
+        models.VideoCategory.sort_order, models.VideoCategory.name,
+    )
+    if roots_only:
+        stmt = stmt.where(models.VideoCategory.parent_id.is_(None))
+    return list(db.execute(stmt).scalars().all())
+
+
+def get_video_category(db: Session, category_id: int) -> Optional[models.VideoCategory]:
+    return db.get(models.VideoCategory, category_id)
+
+
+def get_video_category_by_name(
+    db: Session, name: str, parent_id: Optional[int] = None,
+) -> Optional[models.VideoCategory]:
+    stmt = select(models.VideoCategory).where(models.VideoCategory.name == name)
+    if parent_id is None:
+        stmt = stmt.where(models.VideoCategory.parent_id.is_(None))
+    else:
+        stmt = stmt.where(models.VideoCategory.parent_id == parent_id)
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def upsert_video_category(
+    db: Session, name: str, *, parent_id: Optional[int] = None, sort_order: int = 0,
+) -> tuple[models.VideoCategory, bool]:
+    existing = get_video_category_by_name(db, name, parent_id=parent_id)
+    if existing:
+        existing.sort_order = sort_order
+        db.commit()
+        db.refresh(existing)
+        return existing, False
+    cat = models.VideoCategory(name=name, parent_id=parent_id, sort_order=sort_order)
+    db.add(cat)
+    db.commit()
+    db.refresh(cat)
+    return cat, True
+
+
+def create_video_category(
+    db: Session, name: str, *, parent_id: Optional[int] = None, sort_order: int = 0,
+) -> models.VideoCategory:
+    cat = models.VideoCategory(name=name, parent_id=parent_id, sort_order=sort_order)
+    db.add(cat)
+    db.commit()
+    db.refresh(cat)
+    return cat
+
+
+def update_video_category(db: Session, category: models.VideoCategory, **fields) -> models.VideoCategory:
+    for key, value in fields.items():
+        if value is not None and hasattr(category, key):
+            setattr(category, key, value)
+    db.commit()
+    db.refresh(category)
+    return category
+
+
+def delete_video_category(db: Session, category: models.VideoCategory) -> None:
+    if category.parent_id is None:
+        for child in list(category.children):
+            for video in list(child.videos):
+                if child in video.content_categories:
+                    video.content_categories.remove(child)
+            db.delete(child)
+    else:
+        for video in list(category.videos):
+            if category in video.content_categories:
+                video.content_categories.remove(category)
+    db.delete(category)
+    db.commit()
+
+
+def count_videos_in_category(db: Session, category_id: int) -> int:
+    cat = db.get(models.VideoCategory, category_id)
+    if not cat:
+        return 0
+    if cat.parent_id is None:
+        child_ids = [c.id for c in cat.children]
+        if not child_ids:
+            return 0
+        return db.execute(
+            select(func.count(func.distinct(models.Video.id)))
+            .select_from(models.Video)
+            .join(models.Video.content_categories)
+            .where(models.VideoCategory.id.in_(child_ids))
+        ).scalar_one()
+    return db.execute(
+        select(func.count()).select_from(models.Video)
+        .where(models.Video.content_categories.any(models.VideoCategory.id == category_id))
+    ).scalar_one()
+
+
+def count_uncategorized_videos(db: Session) -> int:
+    return db.execute(
+        select(func.count()).select_from(models.Video)
+        .where(~models.Video.content_categories.any())
+    ).scalar_one()
+
+
+def set_video_categories(db: Session, video_id: int, category_ids: list[int]) -> Optional[models.Video]:
+    video = db.get(models.Video, video_id)
+    if not video:
+        return None
+    cats = []
+    for cid in category_ids:
+        cat = db.get(models.VideoCategory, cid)
+        if cat and cat.parent_id is not None:
+            cats.append(cat)
+    video.content_categories = cats
+    db.commit()
+    db.refresh(video)
+    return video
+
+
+def add_video_to_category(db: Session, video_id: int, category_id: int) -> Optional[models.Video]:
+    video = db.get(models.Video, video_id)
+    cat = db.get(models.VideoCategory, category_id)
+    if not video or not cat or cat.parent_id is None:
+        return None
+    if cat not in video.content_categories:
+        video.content_categories.append(cat)
+        db.commit()
+        db.refresh(video)
+    return video
+
+
+def remove_video_from_category(db: Session, video_id: int, category_id: int) -> Optional[models.Video]:
+    video = db.get(models.Video, video_id)
+    cat = db.get(models.VideoCategory, category_id)
+    if not video or not cat:
+        return None
+    if cat in video.content_categories:
+        video.content_categories.remove(cat)
+        db.commit()
+        db.refresh(video)
+    return video
 
 
 def script_is_running(db: Session, script_id: int) -> bool:

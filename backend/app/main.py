@@ -14,8 +14,12 @@ from pathlib import Path
 
 from .config import FILES_DIR
 from .database import SessionLocal, init_db
-from .routers import resources, scripts, pages, videos, runs, sync, media, browser
+from .routers import (
+    resources, scripts, script_categories, video_categories,
+    pages, videos, runs, sync, media, browser
+)
 from .services.script_registry import sync_registered_scripts
+from .services.content_category_registry import sync_default_categories
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -34,6 +38,11 @@ async def lifespan(app: FastAPI):
             "内置爬虫脚本已同步：新增 %s，更新 %s",
             stats.get("created", 0),
             stats.get("updated", 0),
+        )
+        cat_stats = sync_default_categories(db)
+        logging.getLogger(__name__).info(
+            "视频内容分类已同步：共 %s 个",
+            cat_stats.get("total", 0),
         )
     finally:
         db.close()
@@ -56,6 +65,8 @@ app.include_router(runs.router)
 app.include_router(sync.router)
 app.include_router(scripts.router)
 app.include_router(browser.router)
+app.include_router(script_categories.router)
+app.include_router(video_categories.router)
 
 
 @app.get("/health", tags=["meta"])

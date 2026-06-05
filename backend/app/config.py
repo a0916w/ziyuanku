@@ -3,6 +3,7 @@ import os
 import shutil
 import sqlite3
 from pathlib import Path
+from urllib.parse import quote_plus
 
 # backend/
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -15,7 +16,29 @@ FILES_DIR = Path(os.getenv("ZIYUANKU_FILES_DIR", DATA_DIR))
 MEDIA_DIR = Path(os.getenv("ZIYUANKU_MEDIA_DIR", DATA_DIR / "media"))
 
 DB_PATH = DATA_DIR / "ziyuanku.db"
-DATABASE_URL = os.getenv("ZIYUANKU_DATABASE_URL", f"sqlite:///{DB_PATH}")
+
+
+def _build_mysql_url_from_env() -> str | None:
+    """从环境变量构建 MySQL URL（mysql+pymysql://...）。"""
+    host = os.getenv("ZIYUANKU_MYSQL_HOST")
+    if not host:
+        return None
+    port = os.getenv("ZIYUANKU_MYSQL_PORT", "3306")
+    user = os.getenv("ZIYUANKU_MYSQL_USER", "root")
+    password = os.getenv("ZIYUANKU_MYSQL_PASSWORD", "")
+    database = os.getenv("ZIYUANKU_MYSQL_DB", "ziyuanku")
+    charset = os.getenv("ZIYUANKU_MYSQL_CHARSET", "utf8mb4")
+    return (
+        f"mysql+pymysql://{quote_plus(user)}:{quote_plus(password)}@"
+        f"{host}:{port}/{database}?charset={charset}"
+    )
+
+
+DATABASE_URL = (
+    os.getenv("ZIYUANKU_DATABASE_URL")
+    or _build_mysql_url_from_env()
+    or f"sqlite:///{DB_PATH}"
+)
 
 # 旧版数据库位置（backend/data/），启动时自动迁移到 DATA_DIR
 LEGACY_DB_PATH = BASE_DIR / "data" / "ziyuanku.db"

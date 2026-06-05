@@ -11,10 +11,15 @@ import argparse
 import json
 import re
 import time
+from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
+
+from cover_download import REPO_ROOT, download_covers_for_videos
+
+DEFAULT_JSON = REPO_ROOT / "data" / "metadata" / "sweetie_fox_videos.json"
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -205,10 +210,17 @@ def scrape(
 
         browser.close()
 
-    with open(save_to, "w", encoding="utf-8") as f:
+    ok, skip = download_covers_for_videos(
+        all_videos, source="pornhub", referer=base_url, key_field="vkey",
+    )
+    print(f"封面下载: 成功 {ok}，跳过 {skip}")
+
+    save_path = Path(save_to)
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(save_path, "w", encoding="utf-8") as f:
         json.dump(all_videos, f, ensure_ascii=False, indent=2)
 
-    print(f"\n爬取完成！共 {len(all_videos)} 个视频，已保存到 {save_to}")
+    print(f"\n爬取完成！共 {len(all_videos)} 个视频，已保存到 {save_path}")
     return all_videos
 
 
@@ -223,7 +235,7 @@ def main():
     parser.add_argument("--max-pages", type=int, default=10, help="最多爬取页数")
     parser.add_argument(
         "-o", "--output",
-        default="sweetie_fox_videos.json",
+        default=str(DEFAULT_JSON),
         help="输出 JSON 路径",
     )
     args = parser.parse_args()

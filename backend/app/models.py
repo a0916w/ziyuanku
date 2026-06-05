@@ -2,11 +2,19 @@
 from datetime import datetime
 
 from sqlalchemy import (
-    Column, Integer, String, Text, DateTime, ForeignKey, Boolean, JSON,
+    Column, Integer, String, Text, DateTime, ForeignKey, Boolean, JSON, Table,
 )
 from sqlalchemy.orm import relationship
 
 from .database import Base
+
+# 视频 ↔ 内容分类（多对多，通常绑定到子分类）
+video_category_map = Table(
+    "video_category_map",
+    Base.metadata,
+    Column("video_id", Integer, ForeignKey("videos.id", ondelete="CASCADE"), primary_key=True),
+    Column("category_id", Integer, ForeignKey("video_categories.id", ondelete="CASCADE"), primary_key=True),
+)
 
 # 资源状态机（四态）：未处理 → 已发送切片 → 切片完毕 → 已发送到项目
 STATUS_PENDING = "pending"            # 未处理
@@ -76,8 +84,11 @@ class Video(Base):
     id = Column(Integer, primary_key=True)
     code = Column(String(128), index=True)              # 番号，优先作去重键
     title = Column(String(512), nullable=False)
-    cover_url = Column(String(1024))                    # 封面图 URL
-    source_url = Column(String(1024), nullable=False, index=True)  # 详情页链接
+    cover_url = Column(String(1024))                    # 封面图远程 URL
+    cover_path = Column(String(1024))                   # 封面图本地原图路径
+    cover_clean_path = Column(String(1024))             # 去水印后封面图路径
+    # MySQL utf8mb4 下索引长度有限，source_url 索引列控制在 512
+    source_url = Column(String(512), nullable=False, index=True)  # 详情页链接
     duration = Column(String(32))
     video_url = Column(String(2048))                    # 视频流地址（m3u8 等）
     file_path = Column(String(1024))                    # 本地下载路径
@@ -91,6 +102,43 @@ class Video(Base):
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    content_categories = relationship(
+        "VideoCategory", secondary=video_category_map, back_populates="videos",
+    )
+
+
+class VideoCategory(Base):
+    """视频内容分类（一级 + 子分类）。"""
+    __tablename__ = "video_categories"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(128), nullable=False)
+    parent_id = Column(Integer, ForeignKey("video_categories.id"), index=True)
+    sort_order = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    parent = relationship("VideoCategory", remote_side="VideoCategory.id", back_populates="children")
+    children = relationship(
+        "VideoCategory", back_populates="parent",
+        order_by="VideoCategory.sort_order, VideoCategory.name",
+    )
+    videos = relationship(
+        "Video", secondary=video_category_map, back_populates="content_categories",
+    )
+
+
+class ScriptCategory(Base):
+    """爬虫脚本分类（可自定义添加）。"""
+    __tablename__ = "script_categories"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(128), unique=True, nullable=False)
+    description = Column(Text)
+    sort_order = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    scripts = relationship("CrawlScript", back_populates="category")
+
 
 class CrawlScript(Base):
     """爬虫脚本登记：管理可运行的爬虫脚本。"""
@@ -101,9 +149,11 @@ class CrawlScript(Base):
     # 运行命令（相对仓库根或绝对），例如：python3 ig_downloader.py --file usernames.txt
     command = Column(Text, nullable=False)
     description = Column(Text)
+    category_id = Column(Integer, ForeignKey("script_categories.id"), index=True)
     enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    category = relationship("ScriptCategory", back_populates="scripts")
     runs = relationship("CrawlRun", back_populates="script",
                         cascade="all, delete-orphan", order_by="desc(CrawlRun.started_at)")
 

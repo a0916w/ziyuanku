@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}分类浏览 · 资源库后台{% endblock %}
+{% block content %}
+<h1>分类浏览
+  <span class="muted" style="font-size:14px;font-weight:normal">
+    {% if uncategorized %}未分类 · {{ total }} 条
+    {% elif current_category %}{{ current_category.name }} · {{ total }} 条
+    {% else %}全部 · {{ total_videos }} 条{% endif %}
+    {% if total and (current_category_id or uncategorized) %} · 第 {{ page }}/{{ total_pages }} 页{% endif %}
+  </span>
+</h1>
+<p class="muted">爬虫入库的视频可绑定到左侧子分类；分类结构维护请前往<a href="/category-editor">分类编辑</a>。</p>
+
+<div class="scripts-layout browse-layout">
+  <aside class="cat-panel browse-panel">
+    <h2>内容分类</h2>
+    <ul class="cat-list browse-cat-list">
+      <li>
+        <a href="/browse" class="cat-item {{ 'on' if not current_category_id and not uncategorized else '' }}">
+          全部 <span class="cat-count">{{ total_videos }}</span>
+        </a>
+      </li>
+      <li>
+        <a href="/browse?uncategorized=1" class="cat-item {{ 'on' if uncategorized else '' }}">
+          未分类 <span class="cat-count">{{ uncategorized_count }}</span>
+        </a>
+      </li>
+    </ul>
+    {% for group in category_tree %}
+    <div class="browse-group">
+      <a href="/browse?category_id={{ group.id }}"
+         class="cat-item browse-parent {{ 'on' if current_category_id == group.id else '' }}">
+        {{ group.name }}
+        <span class="cat-count">{{ group.video_count }}</span>
+      </a>
+      <ul class="cat-list browse-sub-list">
+        {% for sub in group.children %}
+        <li>
+          <a href="/browse?category_id={{ sub.id }}"
+             class="cat-item browse-sub {{ 'on' if current_category_id == sub.id else '' }}">
+            {{ sub.name }}
+            <span class="cat-count">{{ sub.video_count }}</span>
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
+  </aside>
+
+  <div class="scripts-main browse-main">
+    {% if current_category_id and current_category and current_category.parent_id %}
+    <details class="addbox" id="bind-box">
+      <summary>+ 从未分类视频绑定到「{{ current_category.name }}」</summary>
+      <p class="muted">下方列表为尚未归入任何分类的视频，勾选后点绑定。</p>
+      <div id="uncat-pick-list" class="bind-pick-list muted">加载中…</div>
+      <p class="toolbar">
+        <button type="button" id="btn-bind-selected" class="primary" disabled>绑定选中</button>
+      </p>
+    </details>
+    {% endif %}
+
+    {% if items %}
+    <table class="grid res-table browse-table">
+      <thead>
+        <tr>
+          <th class="col-cover">封面</th>
+          <th class="col-code">番号</th>
+          <th class="col-title">标题</th>
+          <th class="col-cats">分类</th>
+          <th class="col-source">来源</th>
+          <th class="col-act">操作</th>
+        </tr>
+      </thead>
+      <tbody id="browse-grid">
+      {% for item in items %}
+      {% set v = item.v %}
+        <tr class="res-row browse-row" data-id="{{ v.id }}">
+          <td class="col-cover">
+            <div class="res-thumb res-preview" role="button" tabindex="0"
+                 data-url="{{ item.play_url }}" data-type="video"
+                 data-cover="{{ item.cover_url or '' }}">
+              {% if item.cover_url %}
+              <img src="{{ item.cover_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">
+              {% else %}
+              <span class="res-missing">—</span>
+              {% endif %}
+              {% if item.has_file %}<span class="res-play-sm">▶</span>{% endif %}
+            </div>
+          </td>
+          <td class="col-code">{{ v.code or '—' }}</td>
+          <td class="col-title caption" title="{{ v.title }}">{{ v.title }}</td>
+          <td class="col-cats">
+            {% if item.categories %}
+              {% for c in item.categories %}
+              <a href="/browse?category_id={{ c.id }}" class="chip">{{ c.name }}</a>
+              {% endfor %}
+            {% else %}
+              <span class="muted">—</span>
+            {% endif %}
+          </td>
+          <td class="col-source">{{ v.source }}</td>
+          <td class="col-act">
+            {% if current_category_id and current_category and current_category.parent_id %}
+            <button type="button" class="unbind-btn" data-id="{{ v.id }}" data-cat="{{ current_category_id }}">移出</button>
+            {% elif uncategorized %}
+            <select class="bind-select" data-id="{{ v.id }}">
+              <option value="">归入…</option>
+              {% for group in category_tree %}
+                {% for sub in group.children %}
+                <option value="{{ sub.id }}">{{ group.name }} / {{ sub.name }}</option>
+                {% endfor %}
+              {% endfor %}
+            </select>
+            {% else %}
+            {% if v.source_url %}
+            <a href="{{ v.source_url }}" target="_blank" rel="noopener">原页</a>
+            {% else %}—{% endif %}
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    <nav class="pager">
+      {% if prev_url %}
+      <a class="chip" href="{{ prev_url }}">上一页</a>
+      {% else %}
+      <span class="chip disabled">上一页</span>
+      {% endif %}
+      <span class="muted">第 {{ page }} / {{ total_pages }} 页，每页 {{ page_size }} 条</span>
+      {% if next_url %}
+      <a class="chip" href="{{ next_url }}">下一页</a>
+      {% else %}
+      <span class="chip disabled">下一页</span>
+      {% endif %}
+    </nav>
+    {% else %}
+    <p class="muted">
+      {% if uncategorized %}暂无未分类视频。{% elif current_category_id %}该分类下暂无视频，可从「未分类」绑定。{% else %}暂无视频，请先运行爬虫入库。{% endif %}
+    </p>
+    {% endif %}
+  </div>
+</div>
+
+<div id="lightbox" class="lightbox hidden" aria-hidden="true">
+  <button type="button" class="lightbox-close" aria-label="关闭">×</button>
+  <div class="lightbox-body"></div>
+</div>
+
+{% if current_category_id and current_category and current_category.parent_id %}
+<script>window.__BIND_CATEGORY_ID__ = {{ current_category_id }};</script>
+{% endif %}
+{% endblock %}

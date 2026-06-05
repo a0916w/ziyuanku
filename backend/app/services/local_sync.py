@@ -142,19 +142,30 @@ def sync_site_videos(
             title = meta.get("title", path.stem)
             source_url = meta.get("url", "")
             cover = meta.get("cover")
+            cover_path = meta.get("cover_path")
             duration = meta.get("duration")
             code = meta.get(code_key) or meta.get("vkey")
         else:
             title = path.stem
             source_url = f"file://{path.resolve()}"
-            cover = duration = None
+            cover = duration = cover_path = None
             code = path.stem.split(" ", 1)[0] if source == "pornhub" else None
+
+        if not cover_path and code:
+            covers_dir = DATA_DIR / "covers" / source
+            if covers_dir.is_dir():
+                for ext in (".jpg", ".jpeg", ".png", ".webp"):
+                    p = covers_dir / f"{code}{ext}"
+                    if p.is_file():
+                        cover_path = str(p.resolve())
+                        break
 
         payload = VideoIn(
             title=title,
             code=code,
             source_url=source_url,
             cover=cover,
+            cover_path=cover_path,
             duration=duration or None,
             file_path=str(path.resolve()),
             download_status=models.DL_DONE,

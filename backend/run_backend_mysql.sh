@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 可按需覆盖这些变量
+export ZIYUANKU_MYSQL_HOST="${ZIYUANKU_MYSQL_HOST:-127.0.0.1}"
+export ZIYUANKU_MYSQL_PORT="${ZIYUANKU_MYSQL_PORT:-3306}"
+export ZIYUANKU_MYSQL_USER="${ZIYUANKU_MYSQL_USER:-root}"
+export ZIYUANKU_MYSQL_PASSWORD="${ZIYUANKU_MYSQL_PASSWORD:-}"
+export ZIYUANKU_MYSQL_DB="${ZIYUANKU_MYSQL_DB:-ziyuanku}"
+export ZIYUANKU_MYSQL_CHARSET="${ZIYUANKU_MYSQL_CHARSET:-utf8mb4}"
+
+uvicorn app.main:app --reload

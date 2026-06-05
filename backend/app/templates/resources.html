@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}资源库 · 资源库后台{% endblock %}
 {% block content %}
-<h1>资源库{% if total is defined %} <span class="muted" style="font-size:14px;font-weight:normal">共 {{ total }} 条</span>{% endif %}</h1>
+<h1>资源库 <span class="muted" style="font-size:14px;font-weight:normal">共 {{ total }} 条 · 第 {{ page }}/{{ total_pages }} 页</span></h1>
 
 <section class="cards">
   {% for s in dl_order %}
@@ -13,59 +13,159 @@
 </section>
 
 <div class="filters">
-  <a class="chip {{ 'on' if not current_dl_status }}" href="/resources">全部</a>
+  <span class="muted">视图：</span>
+  <a class="chip {{ 'on' if not trash_only }}" href="/resources{{ '?source=' ~ current_source if current_source else '' }}{{ '&download_status=' ~ current_dl_status if current_dl_status and current_source else ('?download_status=' ~ current_dl_status if current_dl_status and not current_source else '') }}{{ '&keyword=' ~ current_keyword if current_keyword and (current_source or current_dl_status) else ('?keyword=' ~ current_keyword if current_keyword and not (current_source or current_dl_status) else '') }}">资源库</a>
+  <a class="chip {{ 'on' if trash_only }}" href="/resources?trash=1{{ '&source=' ~ current_source if current_source else '' }}{{ '&download_status=' ~ current_dl_status if current_dl_status else '' }}{{ '&keyword=' ~ current_keyword if current_keyword else '' }}">回收站</a>
+</div>
+
+<div class="filters">
+  <form class="search-form" method="get" action="/resources">
+    {% if trash_only %}<input type="hidden" name="trash" value="1">{% endif %}
+    {% if current_source %}<input type="hidden" name="source" value="{{ current_source }}">{% endif %}
+    {% if current_dl_status %}<input type="hidden" name="download_status" value="{{ current_dl_status }}">{% endif %}
+    <input name="keyword" value="{{ current_keyword }}" placeholder="搜索标题/番号/链接" />
+    <button type="submit">搜索</button>
+    {% if current_keyword %}
+    <a class="chip" href="/resources{% if current_source or current_dl_status %}?{% endif %}{% if current_source %}source={{ current_source }}{% endif %}{% if current_source and current_dl_status %}&{% endif %}{% if current_dl_status %}download_status={{ current_dl_status }}{% endif %}">清空</a>
+    {% endif %}
+  </form>
+  <input id="preset-name" placeholder="筛选方案名" style="min-width:140px">
+  <button type="button" id="btn-save-preset">保存方案</button>
+  <select id="preset-select" style="min-width:160px"><option value="">选择方案</option></select>
+  <button type="button" id="btn-apply-preset">应用</button>
+  <button type="button" id="btn-del-preset">删除</button>
+</div>
+
+<div class="filters">
+  <span class="muted">来源：</span>
+  <a class="chip {{ 'on' if not current_source }}" href="/resources{{ '?download_status=' ~ current_dl_status if current_dl_status else '' }}{{ '&keyword=' ~ current_keyword if current_keyword and current_dl_status else ('?keyword=' ~ current_keyword if current_keyword and not current_dl_status else '') }}">全部</a>
+  <a class="chip {{ 'on' if current_source=='missav' }}" href="/resources?source=missav{{ '&download_status=' ~ current_dl_status if current_dl_status else '' }}{{ '&keyword=' ~ current_keyword if current_keyword else '' }}">MissAV</a>
+  <a class="chip {{ 'on' if current_source=='pornhub' }}" href="/resources?source=pornhub{{ '&download_status=' ~ current_dl_status if current_dl_status else '' }}{{ '&keyword=' ~ current_keyword if current_keyword else '' }}">Pornhub</a>
+</div>
+
+<div class="filters">
+  <span class="muted">状态：</span>
+  <a class="chip {{ 'on' if not current_dl_status }}" href="/resources{{ '?source=' ~ current_source if current_source else '' }}{{ '&keyword=' ~ current_keyword if current_keyword and current_source else ('?keyword=' ~ current_keyword if current_keyword and not current_source else '') }}">全部</a>
   {% for s in dl_order %}
-  <a class="chip {{ 'on' if current_dl_status==s }}" href="/resources?download_status={{ s }}">{{ dl_labels[s] }}</a>
+  <a class="chip {{ 'on' if current_dl_status==s }}" href="/resources?download_status={{ s }}{{ '&source=' ~ current_source if current_source else '' }}{{ '&keyword=' ~ current_keyword if current_keyword else '' }}">{{ dl_labels[s] }}</a>
   {% endfor %}
 </div>
 
+<div class="toolbar">
+  {% if not trash_only %}<button type="button" id="btn-open-add" class="primary">新增资源</button>{% endif %}
+  <span id="selected-count" class="chip">已选 0</span>
+  <select id="batch-status">
+    <option value="">批量改状态</option>
+    {% for s in dl_order %}<option value="{{ s }}">{{ dl_labels[s] }}</option>{% endfor %}
+  </select>
+  <select id="batch-category">
+    <option value="">批量改分类</option>
+    {% for c in selectable_categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+  </select>
+  <button type="button" id="btn-batch-export">导出CSV</button>
+  <button type="button" id="btn-batch-delete">{{ '移到回收站' if not trash_only else '彻底删除' }}</button>
+  {% if trash_only %}<button type="button" id="btn-batch-restore">批量恢复</button>{% endif %}
+  {% if not trash_only %}
+  <button type="button" id="btn-batch-cover" class="primary">批量补封面图</button>
+  <span class="muted">从本地视频自动截帧生成封面（仅处理缺失封面）</span>
+  <button type="button" id="btn-batch-watermark" class="primary">批量去封面水印</button>
+  <span class="muted">会处理当前库里所有未处理封面（后台执行，完成后自动刷新）</span>
+  {% endif %}
+</div>
+
 {% if items %}
-<ul class="res-list" id="res-grid">
+<table class="grid res-table">
+  <thead>
+    <tr>
+      <th style="width:42px"><input type="checkbox" id="select-all"></th>
+      <th class="col-cover">封面</th>
+      <th class="col-code">番号</th>
+      <th class="col-title">标题</th>
+      <th class="col-source">来源</th>
+      <th class="col-dur">时长</th>
+      <th class="col-status">状态</th>
+      <th class="col-progress">进度</th>
+      <th class="col-time">入库时间</th>
+      <th class="col-act">操作</th>
+    </tr>
+  </thead>
+  <tbody id="res-grid">
   {% for item in items %}
   {% set v = item.v %}
-  <li class="res-card"
-      data-id="{{ v.id }}"
-      data-status="{{ v.download_status or 'pending' }}"
-      data-progress="{{ item.progress }}"
-      data-indeterminate="{{ '1' if item.indeterminate else '0' }}">
-    <div class="res-cover-wrap">
-      <div class="res-preview" role="button" tabindex="0"
-           data-url="{{ item.play_url }}" data-type="video"
-           data-cover="{{ item.cover_url or '' }}">
-        {% if item.cover_url %}
-        <img src="{{ item.cover_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">
-        {% elif item.has_file %}
-        <div class="res-missing">无封面</div>
-        {% else %}
-        <div class="res-missing">无预览</div>
-        {% endif %}
-        {% if item.has_file %}<span class="res-play">▶</span>{% endif %}
-      </div>
-      <div class="res-progress-wrap">
-        <div class="res-progress-track status-dl-{{ v.download_status or 'pending' }}">
-          <div class="res-progress-fill" style="width: {{ item.progress }}%"></div>
-          {% if item.indeterminate %}<div class="res-progress-indeterminate"></div>{% endif %}
+    <tr class="res-row"
+        data-id="{{ v.id }}"
+        data-status="{{ v.download_status or 'pending' }}"
+        data-progress="{{ item.progress }}"
+        data-indeterminate="{{ '1' if item.indeterminate else '0' }}">
+      <td><input type="checkbox" class="row-select" value="{{ v.id }}"></td>
+      <td class="col-cover">
+        <div class="res-thumb res-preview" role="button" tabindex="0"
+             data-url="{{ item.play_url }}" data-type="video"
+             data-cover="{{ item.cover_url or '' }}"
+             data-cover-raw="{{ item.cover_raw_url or '' }}"
+             data-cover-clean="{{ item.cover_clean_url or '' }}">
+          {% if item.cover_url %}
+          <img src="{{ item.cover_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">
+          {% else %}
+          <span class="res-missing">—</span>
+          {% endif %}
+          {% if item.has_file %}<span class="res-play-sm">▶</span>{% endif %}
+          {% if item.has_clean_cover %}<span class="wm-badge">净图</span>{% endif %}
         </div>
-        <div class="res-progress-text">
-          <span class="res-progress-label">{{ item.status_label }}</span>
+      </td>
+      <td class="col-code">{{ v.code or '—' }}</td>
+      <td class="col-title caption" title="{{ v.title }}">{{ v.title }}</td>
+      <td class="col-source">{{ v.source }}</td>
+      <td class="col-dur">{{ v.duration or '—' }}</td>
+      <td class="col-status">
+        <span class="status status-dl-{{ v.download_status or 'pending' }} res-progress-label">{{ item.status_label }}</span>
+      </td>
+      <td class="col-progress">
+        <div class="res-progress-inline">
+          <div class="res-progress-track status-dl-{{ v.download_status or 'pending' }}">
+            <div class="res-progress-fill" style="width: {{ item.progress }}%"></div>
+            {% if item.indeterminate %}<div class="res-progress-indeterminate"></div>{% endif %}
+          </div>
           <span class="res-progress-pct">{% if item.indeterminate %}…{% else %}{{ item.progress }}%{% endif %}</span>
         </div>
-      </div>
-    </div>
-    <div class="res-meta">
-      <div class="res-caption" title="{{ v.title }}">{{ v.title }}</div>
-      <div class="res-foot muted">
-        <span>{{ v.code or '—' }}</span>
-        <span>{{ v.source }}</span>
-        {% if v.duration %}<span>{{ v.duration }}</span>{% endif %}
+      </td>
+      <td class="col-time muted">{{ v.created_at.strftime('%Y-%m-%d %H:%M') if v.created_at else '—' }}</td>
+      <td class="col-act">
         {% if v.source_url %}
-        <a href="{{ v.source_url }}" target="_blank" rel="noopener" onclick="event.stopPropagation()">原页</a>
+        <a href="{{ v.source_url }}" target="_blank" rel="noopener">原页</a>
+        {% else %}—{% endif %}
+        {% if not item.cover_raw_url and v.file_path %}
+        <button type="button" class="link-btn btn-row-cover" data-id="{{ v.id }}">补封面</button>
         {% endif %}
-      </div>
-    </div>
-  </li>
+        {% if v.cover_url %}
+        <button type="button" class="link-btn btn-row-watermark" data-id="{{ v.id }}">去水印</button>
+        {% endif %}
+        {% if item.cover_clean_url %}
+        <button type="button" class="link-btn btn-view-clean" data-url="{{ item.cover_clean_url }}">看净图</button>
+        {% endif %}
+        <button type="button" class="link-btn btn-edit" data-id="{{ v.id }}">编辑</button>
+        {% if not trash_only %}
+        <button type="button" class="link-btn btn-row-delete" data-id="{{ v.id }}">删除</button>
+        {% endif %}
+      </td>
+    </tr>
   {% endfor %}
-</ul>
+  </tbody>
+</table>
+
+<nav class="pager">
+  {% if prev_url %}
+  <a class="chip" href="{{ prev_url }}">上一页</a>
+  {% else %}
+  <span class="chip disabled">上一页</span>
+  {% endif %}
+  <span class="muted">第 {{ page }} / {{ total_pages }} 页，每页 {{ page_size }} 条</span>
+  {% if next_url %}
+  <a class="chip" href="{{ next_url }}">下一页</a>
+  {% else %}
+  <span class="chip disabled">下一页</span>
+  {% endif %}
+</nav>
 {% else %}
 <p class="muted">暂无资源。运行爬虫后 <code>POST /api/videos</code> 入库，或点<a href="/">概览</a>「同步本地 data/」。</p>
 {% endif %}
@@ -73,5 +173,52 @@
 <div id="lightbox" class="lightbox hidden" aria-hidden="true">
   <button type="button" class="lightbox-close" aria-label="关闭">×</button>
   <div class="lightbox-body"></div>
+</div>
+<div id="page-flags" data-trash="{{ '1' if trash_only else '0' }}"></div>
+
+<div id="edit-modal" class="lightbox hidden" aria-hidden="true">
+  <div class="modal-card">
+    <h3>编辑资源</h3>
+    <input type="hidden" id="edit-id">
+    <div class="modal-grid">
+      <label>标题<input id="edit-title"></label>
+      <label>番号<input id="edit-code"></label>
+      <label>来源<select id="edit-source"><option value="missav">missav</option><option value="pornhub">pornhub</option><option value="instagram">instagram</option></select></label>
+      <label>时长<input id="edit-duration"></label>
+      <label style="grid-column:1/-1">原页链接<input id="edit-source-url"></label>
+      <label style="grid-column:1/-1">封面URL<input id="edit-cover-url"></label>
+      <label style="grid-column:1/-1">备注<input id="edit-note"></label>
+      <label style="grid-column:1/-1">标签（逗号分隔）<input id="edit-tags"></label>
+      <label style="grid-column:1/-1">分类
+        <select id="edit-category">
+          <option value="">不改分类</option>
+          {% for c in selectable_categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="toolbar">
+      <button type="button" id="btn-edit-save" class="primary">保存</button>
+      <button type="button" id="btn-edit-cancel">取消</button>
+    </div>
+  </div>
+</div>
+
+<div id="add-modal" class="lightbox hidden" aria-hidden="true">
+  <div class="modal-card">
+    <h3>新增资源</h3>
+    <div class="modal-grid">
+      <label>标题*<input id="add-title"></label>
+      <label>番号<input id="add-code"></label>
+      <label>来源<select id="add-source"><option value="missav">missav</option><option value="pornhub">pornhub</option><option value="instagram">instagram</option></select></label>
+      <label>时长<input id="add-duration" placeholder="例如 12:34"></label>
+      <label style="grid-column:1/-1">详情页链接*<input id="add-source-url" placeholder="https://..."></label>
+      <label style="grid-column:1/-1">封面URL<input id="add-cover-url" placeholder="https://..."></label>
+      <label style="grid-column:1/-1">本地文件路径<input id="add-file-path" placeholder="/abs/path/video.mp4"></label>
+    </div>
+    <div class="toolbar">
+      <button type="button" id="btn-add-save" class="primary">新增</button>
+      <button type="button" id="btn-add-cancel">取消</button>
+    </div>
+  </div>
 </div>
 {% endblock %}

@@ -53,6 +53,7 @@ class VideoIn(BaseModel):
     url: Optional[str] = Field(None, description="详情页链接（与 source_url 二选一）")
     cover: Optional[str] = Field(None, description="封面图 URL")
     cover_url: Optional[str] = Field(None, description="封面图 URL（与 cover 二选一）")
+    cover_path: Optional[str] = Field(None, description="封面图本地路径")
     duration: Optional[str] = None
     video_url: Optional[str] = Field(None, description="视频流地址（m3u8 等）")
     file_path: Optional[str] = Field(None, description="本地下载文件路径")
@@ -76,6 +77,8 @@ class VideoOut(BaseModel):
     code: Optional[str]
     title: str
     cover_url: Optional[str]
+    cover_path: Optional[str]
+    cover_clean_path: Optional[str]
     source_url: str
     duration: Optional[str]
     video_url: Optional[str]
@@ -108,10 +111,23 @@ class VideoIngestResult(BaseModel):
     ids: list[int]
 
 
+class ScriptCategoryIn(BaseModel):
+    name: str = Field(..., min_length=1, max_length=128)
+    description: Optional[str] = None
+    sort_order: int = 0
+
+
+class ScriptCategoryUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=128)
+    description: Optional[str] = None
+    sort_order: Optional[int] = None
+
+
 class ScriptIn(BaseModel):
     name: str
     command: str
     description: Optional[str] = None
+    category_id: Optional[int] = None
     enabled: bool = True
 
 
@@ -119,4 +135,36 @@ class ScriptUpdate(BaseModel):
     name: Optional[str] = None
     command: Optional[str] = None
     description: Optional[str] = None
+    category_id: Optional[int] = None
     enabled: Optional[bool] = None
+
+
+class VideoCategoryOut(BaseModel):
+    id: int
+    name: str
+    parent_id: Optional[int]
+    sort_order: int
+    video_count: int = 0
+    children: list["VideoCategoryOut"] = []
+
+    class Config:
+        from_attributes = True
+
+
+class VideoCategoriesAssign(BaseModel):
+    category_ids: list[int] = Field(..., description="子分类 id 列表（会覆盖原绑定）")
+
+
+class VideoCategoryBind(BaseModel):
+    category_id: int = Field(..., description="子分类 id")
+
+
+class VideoCategoryCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=128)
+    parent_id: Optional[int] = Field(None, description="为空表示一级分类")
+    sort_order: int = 0
+
+
+class VideoCategoryUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=128)
+    sort_order: Optional[int] = None

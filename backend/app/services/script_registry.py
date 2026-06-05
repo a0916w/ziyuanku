@@ -5,6 +5,13 @@ from sqlalchemy.orm import Session
 
 from .. import crud
 
+DEFAULT_CATEGORIES = [
+    {"name": "MissAV", "description": "MissAV 列表与下载", "sort_order": 10},
+    {"name": "Pornhub", "description": "Pornhub 模特页爬虫", "sort_order": 20},
+    {"name": "Instagram", "description": "Instagram 图片/视频下载", "sort_order": 30},
+    {"name": "其它", "description": "自定义脚本", "sort_order": 99},
+]
+
 # 按名称 upsert；命令在仓库根目录执行（见 crawler_runner.REPO_ROOT）
 REGISTERED_SCRIPTS: list[dict] = [
     {
@@ -16,6 +23,7 @@ REGISTERED_SCRIPTS: list[dict] = [
         ),
         "description": "复用后台验证浏览器抓取 MissAV 列表元数据 → data/metadata/twav_videos.json",
         "kind": "scrape",
+        "category": "MissAV",
     },
     {
         "name": "MissAV 视频下载",
@@ -26,6 +34,7 @@ REGISTERED_SCRIPTS: list[dict] = [
         ),
         "description": "复用后台验证浏览器获取 m3u8，并下载 MissAV 视频 → data/missav/twav",
         "kind": "download",
+        "category": "MissAV",
     },
     {
         "name": "Pornhub 列表爬虫",
@@ -36,6 +45,7 @@ REGISTERED_SCRIPTS: list[dict] = [
         ),
         "description": "抓取模特视频列表 → data/metadata/sweetie_fox_videos.json",
         "kind": "scrape",
+        "category": "Pornhub",
     },
     {
         "name": "Pornhub 视频下载",
@@ -45,6 +55,7 @@ REGISTERED_SCRIPTS: list[dict] = [
         ),
         "description": "从 JSON 下载 Pornhub 视频 → data/pornhub/sweetie-fox（耗时长）",
         "kind": "download",
+        "category": "Pornhub",
     },
     {
         "name": "Instagram 下载（示例）",
@@ -54,13 +65,38 @@ REGISTERED_SCRIPTS: list[dict] = [
         ),
         "description": "将 USERNAME 换成目标账号；需自备 cookies。输出到 data/instagram/",
         "kind": "download",
+        "category": "Instagram",
         "enabled": False,
     },
 ]
 
 
+def sync_default_categories(db: Session) -> dict:
+    created = updated = 0
+    for spec in DEFAULT_CATEGORIES:
+        _, is_new = crud.upsert_script_category(
+            db,
+            name=spec["name"],
+            description=spec.get("description"),
+            sort_order=spec.get("sort_order", 0),
+        )
+        if is_new:
+            created += 1
+        else:
+            updated += 1
+    return {"created": created, "updated": updated, "total": len(DEFAULT_CATEGORIES)}
+
+
+def _category_id(db: Session, name: str | None) -> int | None:
+    if not name:
+        return None
+    cat = crud.get_script_category_by_name(db, name)
+    return cat.id if cat else None
+
+
 def sync_registered_scripts(db: Session) -> dict:
-    """把内置脚本同步进 crawl_scripts 表。"""
+    """把内置分类与脚本同步进数据库。"""
+    cat_stats = sync_default_categories(db)
     created = updated = 0
     for spec in REGISTERED_SCRIPTS:
         _, is_new = crud.upsert_script(
@@ -69,9 +105,15 @@ def sync_registered_scripts(db: Session) -> dict:
             command=spec["command"],
             description=spec.get("description"),
             enabled=spec.get("enabled", True),
+            category_id=_category_id(db, spec.get("category")),
         )
         if is_new:
             created += 1
         else:
             updated += 1
-    return {"created": created, "updated": updated, "total": len(REGISTERED_SCRIPTS)}
+    return {
+        "categories": cat_stats,
+        "created": created,
+        "updated": updated,
+        "total": len(REGISTERED_SCRIPTS),
+    }

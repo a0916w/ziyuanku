@@ -18,6 +18,64 @@ uvicorn app.main:app --reload
 
 打开 http://127.0.0.1:8000 ，API 文档在 http://127.0.0.1:8000/docs 。
 
+## 使用 MySQL
+
+默认是 SQLite。要切换 MySQL，有两种方式：
+
+1) 直接提供完整 URL（优先级最高）：
+
+```bash
+export ZIYUANKU_DATABASE_URL="mysql+pymysql://root:password@127.0.0.1:3306/ziyuanku?charset=utf8mb4"
+```
+
+2) 用分项环境变量（系统会自动拼接 URL）：
+
+```bash
+export ZIYUANKU_MYSQL_HOST=127.0.0.1
+export ZIYUANKU_MYSQL_PORT=3306
+export ZIYUANKU_MYSQL_USER=root
+export ZIYUANKU_MYSQL_PASSWORD=password
+export ZIYUANKU_MYSQL_DB=ziyuanku
+export ZIYUANKU_MYSQL_CHARSET=utf8mb4
+```
+
+然后正常启动：
+
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+也可以直接用脚本启动（默认 root@127.0.0.1:3306/ziyuanku）：
+
+```bash
+cd backend
+./run_backend_mysql.sh
+```
+
+### SQLite 迁移到 MySQL
+
+项目内置迁移脚本（按表复制数据，默认先清空目标 MySQL）：
+
+```bash
+cd backend
+python3 migrate_sqlite_to_mysql.py
+```
+
+可选：
+
+```bash
+# 指定源 sqlite 文件
+python3 migrate_sqlite_to_mysql.py --source-sqlite /abs/path/ziyuanku.db
+
+# 指定目标 mysql url
+python3 migrate_sqlite_to_mysql.py --target-url "mysql+pymysql://root:pass@127.0.0.1:3306/ziyuanku?charset=utf8mb4"
+
+# 保留目标库已有数据（不清空）
+python3 migrate_sqlite_to_mysql.py --keep-target-data
+```
+
 ## 入库接口示例
 
 ```bash
@@ -65,7 +123,8 @@ curl -X PATCH http://127.0.0.1:8000/api/videos/1/download \
 - 启动后台时会自动把 `scrapers/` 预设命令同步到数据库（见 `app/services/script_registry.py`）。
 - 打开 http://127.0.0.1:8000/scripts ：可**同步内置脚本**、**登记/编辑/停用/删除**、**运行**并查看日志。
 - 同一脚本不允许并发运行；下载类命令超时 24 小时，列表爬虫 30 分钟。
-- API：`GET/POST /api/scripts`、`POST /api/scripts/sync`、`PATCH/DELETE /api/scripts/{id}`、`POST /api/scripts/{id}/run`。
+- **分类**：左侧可添加/删除分类，点击筛选脚本；登记脚本时可选择分类。
+- API：`GET/POST /api/script-categories`、`GET/POST /api/scripts`、`POST /api/scripts/sync`、`PATCH/DELETE /api/scripts/{id}`、`POST /api/scripts/{id}/run`。
 
 ## 本地数据同步（已下载文件 + 脚本登记）
 

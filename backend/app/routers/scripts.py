@@ -15,11 +15,14 @@ router = APIRouter(prefix="/api/scripts", tags=["scripts"])
 def _script_dict(s: models.CrawlScript) -> dict:
     last = s.runs[0] if s.runs else None
     running = last is not None and last.status == models.RUN_RUNNING
+    cat = s.category
     return {
         "id": s.id,
         "name": s.name,
         "command": s.command,
         "description": s.description,
+        "category_id": s.category_id,
+        "category_name": cat.name if cat else None,
         "enabled": s.enabled,
         "running": running,
         "last_run": None if not last else {
@@ -34,8 +37,8 @@ def _script_dict(s: models.CrawlScript) -> dict:
 
 
 @router.get("", summary="脚本列表")
-def list_scripts(db: Session = Depends(get_db)):
-    return [_script_dict(s) for s in crud.list_scripts(db)]
+def list_scripts(category_id: int | None = None, db: Session = Depends(get_db)):
+    return [_script_dict(s) for s in crud.list_scripts(db, category_id=category_id)]
 
 
 @router.post("/sync", summary="同步内置爬虫脚本到数据库")
@@ -47,8 +50,10 @@ def sync_builtin_scripts(db: Session = Depends(get_db)):
 def create_script(payload: ScriptIn, db: Session = Depends(get_db)):
     if crud.get_script_by_name(db, payload.name):
         raise HTTPException(409, "同名脚本已存在")
-    s = crud.create_script(db, payload.name, payload.command,
-                           payload.description, payload.enabled)
+    s = crud.create_script(
+        db, payload.name, payload.command, payload.description,
+        payload.enabled, payload.category_id,
+    )
     return {"id": s.id, "name": s.name}
 
 

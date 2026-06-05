@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}分类编辑 · 资源库后台{% endblock %}
+{% block content %}
+<h1>分类编辑 <span class="muted" style="font-size:14px;font-weight:normal">共 {{ total_categories }} 个分类</span></h1>
+<p class="muted">在这里维护内容分类结构；分类浏览页只保留筛选和视频绑定。</p>
+
+<p class="toolbar">
+  <button type="button" id="btn-sync-categories" class="primary">同步预设分类</button>
+  <span class="muted">把初始分类模板补齐到数据库</span>
+</p>
+
+<div class="scripts-layout category-editor-layout">
+  <aside class="cat-panel">
+    <h2>新增分类</h2>
+    <form id="add-root-form" class="cat-form">
+      <input name="name" placeholder="一级分类名称" required maxlength="128">
+      <button type="submit" class="primary">新增一级分类</button>
+    </form>
+    <form id="add-sub-form" class="cat-form" style="margin-top:10px;">
+      <select name="parent_id" required>
+        <option value="">选择所属一级分类</option>
+        {% for root in root_categories %}
+        <option value="{{ root.id }}">{{ root.name }}</option>
+        {% endfor %}
+      </select>
+      <input name="name" placeholder="子分类名称" required maxlength="128">
+      <button type="submit">新增子分类</button>
+    </form>
+  </aside>
+
+  <div class="scripts-main">
+    <h2>当前分类结构</h2>
+    {% if category_tree %}
+      {% for group in category_tree %}
+      <section class="editor-group">
+        <div class="editor-group-head">
+          <strong>{{ group.name }}</strong>
+          <span class="muted">({{ group.video_count }} 条视频)</span>
+          <button type="button" class="cat-edit-btn" data-id="{{ group.id }}" data-name="{{ group.name }}">改名</button>
+          <button type="button" class="cat-delete-btn" data-id="{{ group.id }}" data-name="{{ group.name }}">删除</button>
+        </div>
+        {% if group.children %}
+        <ul class="editor-sub-list">
+          {% for sub in group.children %}
+          <li>
+            <span>{{ sub.name }}</span>
+            <span class="muted">({{ sub.video_count }})</span>
+            <button type="button" class="cat-edit-btn" data-id="{{ sub.id }}" data-name="{{ sub.name }}">改名</button>
+            <button type="button" class="cat-delete-btn" data-id="{{ sub.id }}" data-name="{{ sub.name }}">删除</button>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="muted">暂无子分类</p>
+        {% endif %}
+      </section>
+      {% endfor %}
+    {% else %}
+    <p class="muted">暂无分类，先新增一级分类。</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

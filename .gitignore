@@ -14,6 +14,8 @@ downloads/
 !/data/metadata/
 !/data/metadata/**
 !/data/metadata/*.json
+!/data/covers/
+/data/covers/**
 
 # 后台运行时数据（旧路径，兼容）
 backend/data/
