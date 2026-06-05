@@ -326,14 +326,22 @@ body.page-scripts main, body.page-browse main, body.page-category-editor main { 
 /* 资源库表格：一行一条，封面 16:9 */
 .res-table { table-layout: fixed; }
 .res-table .col-cover { width: 112px; }
-.res-table .col-code { width: 100px; }
-.res-table .col-source { width: 72px; }
-.res-table .col-dur { width: 56px; }
-.res-table .col-status { width: 72px; }
-.res-table .col-progress { width: 140px; }
-.res-table .col-time { width: 120px; }
-.res-table .col-act { width: 180px; }
+.res-table .col-code { width: 128px; }
+.res-table .col-source { width: 84px; }
+.res-table .col-dur { width: 64px; }
+.res-table .col-status { width: 92px; }
+.res-table .col-progress { width: 150px; }
+.res-table .col-time { width: 116px; }
+.res-table .col-act { width: 188px; }
 .res-table .col-title { width: auto; }
+.res-table td.col-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; color: var(--text-soft);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.res-table td.col-source { color: var(--text-soft); text-transform: capitalize; }
+.res-table td.col-dur { font-variant-numeric: tabular-nums; color: var(--text-soft); }
+.res-table td.col-title { font-weight: 500; }
 .res-row td { vertical-align: middle; }
 .res-thumb {
   width: 96px;
@@ -429,7 +437,10 @@ body.page-scripts main, body.page-browse main, body.page-category-editor main { 
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.res-table a { color: #1f6feb; text-decoration: none; font-size: 13px; }
+.res-table a { color: var(--primary); text-decoration: none; font-size: 13px; }
+.res-table a:hover { text-decoration: underline; }
+.res-table .col-act { display: table-cell; }
+.res-table td.col-act { line-height: 2; }
 .pager {
   display: flex;
   align-items: center;
