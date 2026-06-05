@@ -15,8 +15,7 @@
       alert(
         "同步完成\n" +
           `MissAV：新增 ${data.missav?.created ?? 0}\n` +
-          `Pornhub：新增 ${data.pornhub?.created ?? 0}\n` +
-          `脚本：登记 ${(data.scripts?.created ?? 0) + (data.scripts?.updated ?? 0)} 个`
+          `Pornhub：新增 ${data.pornhub?.created ?? 0}`
       );
       location.reload();
     } catch (err) {

@@ -13,13 +13,11 @@
     <a href="/resources" class="{{ 'on' if active=='resources' }}">资源库</a>
     <a href="/browse" class="{{ 'on' if active=='browse' }}">分类浏览</a>
     <a href="/category-editor" class="{{ 'on' if active=='category-editor' }}">分类编辑</a>
-    <a href="/scripts" class="{{ 'on' if active=='scripts' }}">爬虫脚本</a>
     <a href="/docs" class="right" target="_blank">API 文档</a>
   </nav>
   <main>
     {% block content %}{% endblock %}
   </main>
-  {% if has_running is defined and has_running %}<script>window.__POLL_RUNS__ = true;</script>{% endif %}
   {% if poll_downloads is defined and poll_downloads %}<script>window.__POLL_DOWNLOADS__ = true;</script>{% endif %}
   <script src="/static/app.js?v=13"></script>
 </body>

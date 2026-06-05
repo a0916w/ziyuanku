@@ -4,7 +4,7 @@
 <h1>概览</h1>
 <p class="toolbar">
   <button type="button" id="btn-sync-local" class="primary">同步本地 data/ 到数据库</button>
-  <span class="muted">扫描已下载视频并登记爬虫脚本</span>
+  <span class="muted">扫描已下载视频并更新资源库</span>
 </p>
 
 <h2>资源库 <a class="section-link" href="/resources">查看全部 →</a></h2>
@@ -17,54 +17,4 @@
   {% endfor %}
 </section>
 
-<h2>脚本执行 <a class="section-link" href="/scripts">管理脚本 →</a></h2>
-{% if recent_runs %}
-<table class="grid" id="runs-table">
-  <thead>
-    <tr><th>脚本</th><th>状态</th><th>开始</th><th>结束</th><th>退出码</th><th>日志</th></tr>
-  </thead>
-  <tbody>
-  {% for r in recent_runs %}
-    <tr data-run-id="{{ r.id }}">
-      <td>{{ r.script.name if r.script else '—' }}</td>
-      <td><span class="status status-run-{{ r.status }}">{{ run_labels.get(r.status, r.status) }}</span></td>
-      <td>{{ r.started_at.strftime('%m-%d %H:%M:%S') if r.started_at else '—' }}</td>
-      <td>{{ r.finished_at.strftime('%m-%d %H:%M:%S') if r.finished_at else '—' }}</td>
-      <td>{{ r.exit_code if r.exit_code is not none else '—' }}</td>
-      <td>{% if r.log %}<button class="log-btn" data-log="{{ r.id }}">查看</button>{% else %}—{% endif %}</td>
-    </tr>
-    {% if r.log %}
-    <tr class="log-row hidden" id="log-{{ r.id }}">
-      <td colspan="6"><pre class="logbox">{{ r.log }}</pre></td>
-    </tr>
-    {% endif %}
-  {% endfor %}
-  </tbody>
-</table>
-{% else %}
-<p class="muted">还没有运行记录，去<a href="/scripts">爬虫脚本</a>页运行一个脚本。</p>
-{% endif %}
-
-<h2>已登记脚本</h2>
-{% if scripts %}
-<table class="grid">
-  <thead><tr><th>名称</th><th>命令</th><th>状态</th><th>最近运行</th></tr></thead>
-  <tbody>
-  {% for sc in scripts %}
-    <tr>
-      <td>{{ sc.name }}</td>
-      <td><code>{{ sc.command }}</code></td>
-      <td>{{ '启用' if sc.enabled else '停用' }}</td>
-      <td>
-        {% if sc.runs %}
-        <span class="status status-run-{{ sc.runs[0].status }}">{{ run_labels.get(sc.runs[0].status, sc.runs[0].status) }}</span>
-        {% else %}—{% endif %}
-      </td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
-{% else %}
-<p class="muted">还没有登记爬虫脚本，去<a href="/scripts">爬虫脚本</a>页添加。</p>
-{% endif %}
 {% endblock %}

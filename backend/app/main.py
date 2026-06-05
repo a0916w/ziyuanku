@@ -15,10 +15,8 @@ from pathlib import Path
 from .config import FILES_DIR
 from .database import SessionLocal, init_db
 from .routers import (
-    resources, scripts, script_categories, video_categories,
-    pages, videos, runs, sync, media, browser
+    resources, video_categories, pages, videos, sync, media
 )
-from .services.script_registry import sync_registered_scripts
 from .services.content_category_registry import sync_default_categories
 
 logging.basicConfig(level=logging.INFO,
@@ -30,15 +28,9 @@ init_db()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """启动时同步内置爬虫脚本到数据库。"""
+    """启动时同步默认视频分类。"""
     db = SessionLocal()
     try:
-        stats = sync_registered_scripts(db)
-        logging.getLogger(__name__).info(
-            "内置爬虫脚本已同步：新增 %s，更新 %s",
-            stats.get("created", 0),
-            stats.get("updated", 0),
-        )
         cat_stats = sync_default_categories(db)
         logging.getLogger(__name__).info(
             "视频内容分类已同步：共 %s 个",
@@ -61,11 +53,7 @@ app.include_router(pages.router)
 app.include_router(resources.router)
 app.include_router(media.router)
 app.include_router(videos.router)
-app.include_router(runs.router)
 app.include_router(sync.router)
-app.include_router(scripts.router)
-app.include_router(browser.router)
-app.include_router(script_categories.router)
 app.include_router(video_categories.router)
 
 

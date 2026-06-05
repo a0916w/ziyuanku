@@ -8,6 +8,6 @@ from ..services.local_sync import run_all
 router = APIRouter(prefix="/api/sync", tags=["sync"])
 
 
-@router.post("/local", summary="扫描 data/ 目录，入库已下载资源并登记脚本")
+@router.post("/local", summary="扫描 data/ 目录并同步资源")
 def sync_local(db: Session = Depends(get_db)):
     return run_all(db)

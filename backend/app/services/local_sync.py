@@ -29,7 +29,6 @@ IG_FILE_RE = re.compile(
 )
 MISSAV_CODE_RE = re.compile(r"^([A-Z0-9]+-[A-Z0-9]+)", re.I)
 
-from .script_registry import sync_registered_scripts
 
 
 def _media_type(path: Path) -> str:
@@ -204,14 +203,9 @@ def sync_pornhub(db: Session) -> dict:
     )
 
 
-def sync_scripts(db: Session) -> dict:
-    return sync_registered_scripts(db)
-
-
 def run_all(db: Session) -> dict:
     """执行全量同步，返回各模块统计。"""
     return {
-        "scripts": sync_scripts(db),
         "missav": sync_missav(db),
         "pornhub": sync_pornhub(db),
     }

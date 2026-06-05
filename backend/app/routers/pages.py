@@ -23,15 +23,9 @@ TEMPLATES = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent
 @router.get("/", response_class=HTMLResponse, summary="首页/概览")
 def dashboard(request: Request, db: Session = Depends(get_db)):
     dl_counts = crud.counts_video_download(db)
-    scripts = crud.list_scripts(db)
-    recent_runs = crud.list_recent_runs(db, limit=8)
     return TEMPLATES.TemplateResponse(request, "dashboard.html", {
-        "scripts": scripts,
         "dl_counts": dl_counts, "dl_labels": models.DL_STATUS_LABELS,
         "dl_order": models.DL_STATUS_ORDER,
-        "run_labels": models.RUN_STATUS_LABELS,
-        "recent_runs": recent_runs,
-        "has_running": crud.has_running_scripts(db),
         "active": "dashboard",
     })
 
@@ -122,7 +116,6 @@ def resources_page(request: Request, page: int = 1,
         "current_keyword": keyword or "",
         "trash_only": trash_only,
         "selectable_categories": selectable_categories,
-        "has_running": crud.has_running_scripts(db),
         "poll_downloads": dl_counts.get(models.DL_DOWNLOADING, 0) > 0,
         "active": "resources",
     })
@@ -211,7 +204,6 @@ def browse_page(
         "uncategorized": is_uncat,
         "uncategorized_count": crud.count_uncategorized_videos(db),
         "total_videos": crud.count_videos(db),
-        "has_running": crud.has_running_scripts(db),
         "active": "browse",
     })
 
@@ -238,36 +230,7 @@ def category_editor_page(request: Request, db: Session = Depends(get_db)):
         "category_tree": category_tree,
         "root_categories": [{"id": r.id, "name": r.name} for r in roots],
         "total_categories": sum(1 + len(item["children"]) for item in category_tree),
-        "has_running": crud.has_running_scripts(db),
         "active": "category-editor",
-    })
-
-
-@router.get("/scripts", response_class=HTMLResponse, summary="爬虫脚本管理页")
-def scripts_page(
-    request: Request,
-    category_id: int | None = None,
-    db: Session = Depends(get_db),
-):
-    categories = crud.list_script_categories(db)
-    category_counts = {
-        c.id: crud.count_scripts_in_category(db, c.id) for c in categories
-    }
-    uncategorized_count = crud.count_uncategorized_scripts(db)
-    scripts = crud.list_scripts(db, category_id=category_id)
-    total_scripts = sum(category_counts.values()) + uncategorized_count
-    recent_runs = crud.list_recent_runs(db, limit=40)
-    return TEMPLATES.TemplateResponse(request, "scripts.html", {
-        "scripts": scripts,
-        "categories": categories,
-        "category_counts": category_counts,
-        "uncategorized_count": uncategorized_count,
-        "total_scripts": total_scripts,
-        "current_category_id": category_id,
-        "recent_runs": recent_runs,
-        "run_labels": models.RUN_STATUS_LABELS,
-        "has_running": crud.has_running_scripts(db),
-        "active": "scripts",
     })
 
 

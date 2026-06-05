@@ -1,3 +1,0 @@
-# 每行填一个 Instagram 用户名，# 开头的行会被忽略
-# natgeo
-# nasa
