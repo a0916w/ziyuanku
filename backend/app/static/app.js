@@ -28,6 +28,132 @@
 })();
 
 
+// ---- 脚本页：服务器验证浏览器 / CDP 会话 ----
+(function () {
+  const panel = document.getElementById("browser-panel");
+  if (!panel) return;
+
+  const urlInput = document.getElementById("browser-target-url");
+  const startBtn = document.getElementById("btn-browser-start");
+  const openBtn = document.getElementById("btn-browser-open-tab");
+  const checkBtn = document.getElementById("btn-browser-check");
+  const stopBtn = document.getElementById("btn-browser-stop");
+  const pill = document.getElementById("browser-status-pill");
+  const text = document.getElementById("browser-status-text");
+  const novnc = document.getElementById("browser-novnc-link");
+  const password = document.getElementById("browser-vnc-password");
+
+  function targetUrl() {
+    return (urlInput.value || "").trim() || "https://missav.ai/dm31/en/twav";
+  }
+
+  function setBusy(btn, label) {
+    btn.disabled = true;
+    btn.dataset.oldText = btn.textContent;
+    btn.textContent = label;
+  }
+
+  function clearBusy(btn) {
+    btn.disabled = false;
+    if (btn.dataset.oldText) btn.textContent = btn.dataset.oldText;
+  }
+
+  function render(data) {
+    const ok = !!data.cdp_available;
+    pill.className = "status " + (ok ? "status-dl-done" : "status-dl-failed");
+    pill.textContent = ok ? "CDP 可用" : "未启动";
+    novnc.href = data.novnc_url || "#";
+    if (data.vnc_password) {
+      password.textContent = `VNC 密码：${data.vnc_password}`;
+      password.classList.remove("hidden");
+    } else {
+      password.textContent = "";
+      password.classList.add("hidden");
+    }
+    const tab = (data.tabs || []).find((item) => item.url && item.url.startsWith("http"));
+    const pieces = [
+      ok ? `Chrome 已连接：${data.browser || data.cdp_url}` : "Chrome 未连接",
+      data.novnc_available ? "noVNC 已启动" : "noVNC 未连接",
+      data.vnc_available ? "VNC 桌面已启动" : "VNC 桌面未连接",
+      tab ? `当前页面：${tab.title || tab.url}` : "",
+      data.reason || "",
+    ].filter(Boolean);
+    text.textContent = pieces.join(" / ");
+  }
+
+  async function postJson(url, body) {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.detail || resp.status);
+    return data;
+  }
+
+  async function refresh() {
+    try {
+      const resp = await fetch("/api/browser/status");
+      render(await resp.json());
+    } catch (err) {
+      text.textContent = "读取状态失败：" + err.message;
+    }
+  }
+
+  startBtn.addEventListener("click", async () => {
+    setBusy(startBtn, "启动中…");
+    try {
+      const data = await postJson("/api/browser/start", { url: targetUrl() });
+      render(data);
+      window.open(data.novnc_url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      alert("启动失败：" + err.message);
+    } finally {
+      clearBusy(startBtn);
+    }
+  });
+
+  openBtn.addEventListener("click", async () => {
+    setBusy(openBtn, "打开中…");
+    try {
+      render(await postJson("/api/browser/open-tab", { url: targetUrl() }));
+    } catch (err) {
+      alert("打开失败：" + err.message);
+    } finally {
+      clearBusy(openBtn);
+    }
+  });
+
+  checkBtn.addEventListener("click", async () => {
+    setBusy(checkBtn, "检查中…");
+    try {
+      const data = await postJson("/api/browser/check-verified", { url: targetUrl() });
+      render(data);
+      alert(data.reason || (data.verified ? "验证已通过" : "仍需验证"));
+    } catch (err) {
+      alert("检查失败：" + err.message);
+    } finally {
+      clearBusy(checkBtn);
+    }
+  });
+
+  stopBtn.addEventListener("click", async () => {
+    if (!confirm("停止验证浏览器？验证会话关闭后，下一次采集可能需要重新验证。")) return;
+    setBusy(stopBtn, "停止中…");
+    try {
+      render(await postJson("/api/browser/stop"));
+    } catch (err) {
+      alert("停止失败：" + err.message);
+    } finally {
+      clearBusy(stopBtn);
+    }
+  });
+
+  refresh();
+})();
+
+
 // ---- 脚本页：同步 / 登记 / 编辑 / 运行 ----
 (function () {
   const syncBtn = document.getElementById("btn-sync-scripts");

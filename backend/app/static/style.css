@@ -78,6 +78,59 @@ td.actions { white-space: nowrap; }
 td.actions button { margin-right: 4px; margin-bottom: 2px; font-size: 13px; padding: 4px 10px; }
 tr.row-running { background: #fffbe6; }
 
+.browser-panel {
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin: 16px 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.browser-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.browser-head h2 { margin: 0 0 4px; }
+.browser-head p { margin: 0; }
+.browser-controls {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) repeat(4, auto);
+  gap: 8px;
+  margin-top: 14px;
+  align-items: center;
+}
+.browser-controls input {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid #d0d3d9;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.browser-meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 10px;
+  min-height: 20px;
+}
+.browser-meta a { color: #1f6feb; text-decoration: none; font-size: 13px; }
+.vnc-password {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #f2f3f5;
+  color: #1f2329;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+.vnc-password.hidden { display: none; }
+@media (max-width: 860px) {
+  .browser-controls { grid-template-columns: 1fr 1fr; }
+  .browser-controls input { grid-column: 1 / -1; }
+}
+
 /* 资源库列表：一行 4 个，封面 16:9 */
 .res-list {
   list-style: none;

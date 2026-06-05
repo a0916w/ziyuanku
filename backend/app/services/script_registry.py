@@ -9,17 +9,22 @@ from .. import crud
 REGISTERED_SCRIPTS: list[dict] = [
     {
         "name": "MissAV 列表爬虫",
-        "command": "python3 scrapers/missav_scraper.py",
-        "description": "抓取 MissAV 列表元数据 → data/metadata/twav_videos.json",
+        "command": (
+            "python3 scrapers/missav_scraper.py "
+            "--cdp-url http://127.0.0.1:9222 "
+            "--max-pages 10 -o data/metadata/twav_videos.json"
+        ),
+        "description": "复用后台验证浏览器抓取 MissAV 列表元数据 → data/metadata/twav_videos.json",
         "kind": "scrape",
     },
     {
         "name": "MissAV 视频下载",
         "command": (
             "python3 scrapers/missav_downloader.py "
-            "-i data/metadata/twav_videos.json -o data/missav/twav"
+            "-i data/metadata/twav_videos.json -o data/missav/twav "
+            "--cdp-url http://127.0.0.1:9222"
         ),
-        "description": "从 JSON 下载 MissAV 视频 → data/missav/twav",
+        "description": "复用后台验证浏览器获取 m3u8，并下载 MissAV 视频 → data/missav/twav",
         "kind": "download",
     },
     {

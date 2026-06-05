@@ -8,6 +8,7 @@
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import tempfile
@@ -21,6 +22,7 @@ from playwright.sync_api import sync_playwright
 M3U8_PATTERN = re.compile(r'https?://[^\s"\']+\.m3u8[^\s"\']*')
 DEFAULT_JSON = "twav_videos.json"
 DEFAULT_OUTPUT = "./videos"
+DEFAULT_CDP_URL = os.getenv("CRAWLER_CDP_URL", "")
 
 
 def sanitize_filename(name: str) -> str:
@@ -42,6 +44,23 @@ def find_m3u8(page, video_url: str, timeout_ms: int = 12000) -> str | None:
     page.on("request", on_request)
     try:
         page.goto(video_url, wait_until="domcontentloaded", timeout=30000)
+        try:
+            page.wait_for_load_state("networkidle", timeout=8000)
+        except Exception:
+            pass
+        html = page.content().lower()
+        if any(
+            marker in html
+            for marker in (
+                "checking your browser",
+                "just a moment",
+                "cf-chl",
+                "cloudflare",
+                "请稍候",
+                "验证",
+            )
+        ):
+            raise RuntimeError("页面仍在验证或被 403 拦截，请先在后台验证浏览器中完成验证。")
         # 等候分辨率专属 m3u8 出现，最多 timeout_ms
         deadline = time.time() + timeout_ms / 1000
         while time.time() < deadline:
@@ -138,6 +157,7 @@ def main():
     parser.add_argument("-i", "--input", default=DEFAULT_JSON, help="视频列表 JSON 文件")
     parser.add_argument("-o", "--output", default=DEFAULT_OUTPUT, help="保存目录")
     parser.add_argument("--skip-existing", action="store_true", default=True, help="已存在的文件跳过")
+    parser.add_argument("--cdp-url", default=DEFAULT_CDP_URL, help="后台验证浏览器 CDP 地址")
     args = parser.parse_args()
 
     videos = json.loads(Path(args.input).read_text(encoding="utf-8"))
@@ -150,15 +170,21 @@ def main():
     tasks = []  # [(i, video, out_path, m3u8_url)]
     print("=== 第一阶段：获取 m3u8 地址 ===")
     with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=["--disable-blink-features=AutomationControlled"],
-        )
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
-            locale="zh-CN",
-        )
-        context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        connected_over_cdp = bool(args.cdp_url)
+        if connected_over_cdp:
+            print(f"连接后台验证浏览器: {args.cdp_url}")
+            browser = p.chromium.connect_over_cdp(args.cdp_url)
+            context = browser.contexts[0] if browser.contexts else browser.new_context()
+        else:
+            browser = p.chromium.launch(
+                headless=True,
+                args=["--disable-blink-features=AutomationControlled"],
+            )
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+                locale="zh-CN",
+            )
+            context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         page = context.new_page()
 
         for i, video in enumerate(videos, 1):
@@ -184,7 +210,9 @@ def main():
             print(f"  m3u8: {m3u8[:80]}...")
             tasks.append((i, video, out_path, m3u8))
 
-        browser.close()
+        page.close()
+        if not connected_over_cdp:
+            browser.close()
 
     # 第二阶段：关闭浏览器后再下载，避免浏览器长时间空置被杀
     print(f"\n=== 第二阶段：下载 {len(tasks)} 个视频 ===")

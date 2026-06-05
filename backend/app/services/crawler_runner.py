@@ -5,6 +5,7 @@ MVP 用后台线程执行，足够单人/小团队使用；并发量大时再换
 import logging
 import shlex
 import subprocess
+import sys
 import threading
 from datetime import datetime
 
@@ -30,6 +31,14 @@ def command_timeout(command: str) -> int:
     return _TIMEOUT_SCRAPE
 
 
+def _command_args(command: str) -> list[str]:
+    """Use the backend interpreter for registered Python scraper commands."""
+    args = shlex.split(command)
+    if args and args[0] in {"python", "python3"}:
+        args[0] = sys.executable
+    return args
+
+
 def _run(run_id: int, command: str):
     db = SessionLocal()
     try:
@@ -37,7 +46,7 @@ def _run(run_id: int, command: str):
         timeout = command_timeout(command)
         try:
             proc = subprocess.run(
-                shlex.split(command),
+                _command_args(command),
                 cwd=str(REPO_ROOT),
                 capture_output=True,
                 text=True,

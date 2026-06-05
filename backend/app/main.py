@@ -14,7 +14,7 @@ from pathlib import Path
 
 from .config import FILES_DIR
 from .database import SessionLocal, init_db
-from .routers import resources, scripts, pages, videos, runs, sync, media
+from .routers import resources, scripts, pages, videos, runs, sync, media, browser
 from .services.script_registry import sync_registered_scripts
 
 logging.basicConfig(level=logging.INFO,
@@ -55,6 +55,7 @@ app.include_router(videos.router)
 app.include_router(runs.router)
 app.include_router(sync.router)
 app.include_router(scripts.router)
+app.include_router(browser.router)
 
 
 @app.get("/health", tags=["meta"])
