@@ -85,11 +85,29 @@ h2 { font-size: 17px; font-weight:650; margin-top: 28px; }
 .caption { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .filters, .toolbar { display: flex; gap: 10px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
-.filters > .muted { font-weight: 500; }
+.filters > .muted { font-weight: 500; min-width: 42px; }
 .toolbar {
   margin: 16px 0; padding: 14px 16px;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); box-shadow: var(--shadow-sm);
+}
+
+/* 视频库：筛选 + 操作合并为一张控制面板卡片 */
+.control-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 16px 18px 4px;
+  margin: 0 0 16px;
+}
+.control-panel .filters { margin: 0 0 12px; }
+.control-panel .filters:first-child { margin-top: 0; }
+.control-panel .toolbar {
+  background: transparent; border: none; box-shadow: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  margin: 4px 0 0; padding: 14px 0 12px;
 }
 .toolbar select,
 input[type="text"], input:not([type]), .toolbar input {

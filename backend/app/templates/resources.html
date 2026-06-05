@@ -12,6 +12,7 @@
   {% endfor %}
 </section>
 
+<section class="control-panel">
 <div class="filters">
   <span class="muted">视图：</span>
   <a class="chip {{ 'on' if not trash_only }}" href="/videos{{ '?source=' ~ current_source if current_source else '' }}{{ '&download_status=' ~ current_dl_status if current_dl_status and current_source else ('?download_status=' ~ current_dl_status if current_dl_status and not current_source else '') }}{{ '&keyword=' ~ current_keyword if current_keyword and (current_source or current_dl_status) else ('?keyword=' ~ current_keyword if current_keyword and not (current_source or current_dl_status) else '') }}">资源库</a>
@@ -72,6 +73,7 @@
   <span class="muted">会处理当前库里所有未处理封面（后台执行，完成后自动刷新）</span>
   {% endif %}
 </div>
+</section>
 
 {% if items %}
 <table class="grid res-table">
