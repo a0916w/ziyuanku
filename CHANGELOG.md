@@ -5,6 +5,16 @@
 
 ## [Unreleased]
 
+### Removed
+- **[BREAKING]** 完全移除「资源（resources）」模块（仅保留视频 videos）：
+  - 删除资源入库/列表/批量发送接口 `POST|GET /api/resources`、`POST /api/resources/batch-send`。
+  - 删除资源文件预览接口 `GET /api/media/resource/{id}`。
+  - 删除 `Resource` 模型、四态状态机常量，及 `ResourceIn/ResourceOut/IngestResult/BatchSendIn` 等 schema。
+  - 删除 `routers/resources.py`、`services/dispatch.py`，并移除 `crud` 中资源读写函数。
+  - 移除 `services/local_sync.py` 中的 Instagram 资源同步逻辑（保留 MissAV/Pornhub 视频同步）。
+  - 移除仅服务于剪片分发的 `ZIYUANKU_DISPATCH_ENDPOINT` / `ZIYUANKU_DISPATCH_TOKEN` 配置。
+  - 数据库删除 `resources` 表。
+
 ### Changed
 - 后端数据库改为仅支持 MySQL：
   - 移除 `backend/app/config.py` 中 SQLite 回退与本地 SQLite 自动迁移逻辑。

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from .. import crud, models
 from ..config import BASE_DIR
-from ..schemas import ResourceIn, VideoIn
+from ..schemas import VideoIn
 
 log = logging.getLogger(__name__)
 
@@ -19,77 +19,7 @@ REPO_ROOT = BASE_DIR.parent
 DATA_DIR = REPO_ROOT / "data"
 METADATA_DIR = DATA_DIR / "metadata"
 
-MEDIA_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".mp4", ".mov"}
-VIDEO_EXTS = {".mp4", ".mov"}
-
-# 帖子多图：20240827_062456_C_KchXIPv3-_3.mp4；单图/Stories/Highlights：20260310_123631_DVtEH0igDPl.jpg
-IG_FILE_RE = re.compile(
-    r"^(\d{8}_\d{6})_(.+?)(?:_(\d+))?\.(jpg|jpeg|png|webp|mp4|mov)$",
-    re.I,
-)
 MISSAV_CODE_RE = re.compile(r"^([A-Z0-9]+-[A-Z0-9]+)", re.I)
-
-
-
-def _media_type(path: Path) -> str:
-    return "video" if path.suffix.lower() in VIDEO_EXTS else "image"
-
-
-def _parse_ig_account(dir_name: str) -> tuple[str, str]:
-    """vitagennn_highlights → (vitagennn, highlight)"""
-    if dir_name.endswith("_highlights"):
-        return dir_name[: -len("_highlights")], "highlight"
-    if dir_name.endswith("_stories"):
-        return dir_name[: -len("_stories")], "story"
-    return dir_name, "post"
-
-
-def _parse_ig_file(path: Path, account: str, kind: str, highlight: Optional[str]) -> ResourceIn | None:
-    m = IG_FILE_RE.match(path.name)
-    if not m:
-        return None
-    shortcode = m.group(2).rstrip("-_")
-    source_url = f"https://www.instagram.com/p/{shortcode}/"
-    extra = {"kind": kind}
-    if highlight:
-        extra["highlight"] = highlight
-    return ResourceIn(
-        file_path=str(path.resolve()),
-        media_type=_media_type(path),
-        source_account=account,
-        source_url=source_url,
-        caption=path.stem,
-        extra=extra,
-    )
-
-
-def sync_instagram(db: Session, root: Path = DATA_DIR / "instagram") -> dict:
-    created = duplicated = skipped = 0
-    if not root.is_dir():
-        return {"created": 0, "duplicated": 0, "skipped": 0}
-
-    for path in sorted(root.rglob("*")):
-        if not path.is_file() or path.suffix.lower() not in MEDIA_EXTS:
-            continue
-        if path.stat().st_size == 0:
-            skipped += 1
-            continue
-
-        rel = path.relative_to(root)
-        account_dir = rel.parts[0] if rel.parts else ""
-        account, kind = _parse_ig_account(account_dir)
-        highlight = rel.parts[1] if kind == "highlight" and len(rel.parts) > 2 else None
-
-        payload = _parse_ig_file(path, account, kind, highlight)
-        if not payload:
-            skipped += 1
-            continue
-
-        _, is_new = crud.ingest_resource(db, payload)
-        created += int(is_new)
-        duplicated += int(not is_new)
-
-    return {"created": created, "duplicated": duplicated, "skipped": skipped}
 
 
 def _load_json_index(path: Path, key: str) -> dict:

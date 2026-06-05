@@ -15,7 +15,7 @@ from pathlib import Path
 from .config import FILES_DIR
 from .database import SessionLocal, init_db
 from .routers import (
-    resources, video_categories, pages, videos, sync, media
+    video_categories, pages, videos, sync, media
 )
 from .services.content_category_registry import sync_default_categories
 
@@ -50,7 +50,6 @@ if FILES_DIR.is_dir():
     app.mount("/files", StaticFiles(directory=str(FILES_DIR)), name="files")
 
 app.include_router(pages.router)
-app.include_router(resources.router)
 app.include_router(media.router)
 app.include_router(videos.router)
 app.include_router(sync.router)

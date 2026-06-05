@@ -40,9 +40,6 @@ if not DATABASE_URL:
 if not DATABASE_URL.startswith("mysql+pymysql://"):
     raise RuntimeError("仅支持 MySQL（mysql+pymysql://）。请检查数据库配置。")
 
-DISPATCH_ENDPOINT = os.getenv("ZIYUANKU_DISPATCH_ENDPOINT", "")
-DISPATCH_TOKEN = os.getenv("ZIYUANKU_DISPATCH_TOKEN", "")
-
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 MEDIA_DIR.mkdir(parents=True, exist_ok=True)
