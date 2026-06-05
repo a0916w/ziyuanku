@@ -15,7 +15,6 @@ class VideoIn(BaseModel):
                 "source_url": "https://example.com/abc-123",
                 "cover": "https://example.com/abc-123.jpg",
                 "duration": "00:18:00",
-                "video_url": "https://cdn.example.com/abc-123/index.m3u8",
                 "file_path": "/home/ziyuanku/data/media/abc-123.mp4",
                 "source": "missav",
                 "extra": {"tags": ["示例标签"], "note": "备注"},
