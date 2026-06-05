@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""把 data/ 下已下载的媒体和 scrapers/ 脚本同步进数据库。
+"""把 data/ 下已下载的媒体同步进数据库。
 
 用法（在 backend 目录）：
   python3 sync_local.py

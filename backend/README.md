@@ -1,34 +1,35 @@
 # 资源库后台（backend）
 
-FastAPI + SQLite 的资源后台 MVP。三大块：
-1. **入库接口** —— 爬虫抓完调 `POST /api/videos` 入库（封面、标题、流地址、本地文件等）。
-2. **资源库** —— 统一浏览已入库视频，按下载状态筛选，支持封面/本地预览。
-3. **爬虫脚本管理** —— 内置脚本自动登记、编辑命令、后台一键运行、查看运行日志。
+FastAPI + SQLAlchemy 的资源后台，聚焦三件事：
 
-下载状态：`待下载 → 下载中 → 已完成 / 失败`
+1. **资源/视频入库**：支持单条和批量入库，带去重逻辑。
+2. **后台管理**：资源库列表、回收站、筛选方案、分类管理、分类浏览。
+3. **下游分发**：批量发送资源到剪片环节（当前支持 stub，占位已就绪）。
 
-## 运行
+## 快速启动
 
 ```bash
 cd backend
-python3 -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-打开 http://127.0.0.1:8000 ，API 文档在 http://127.0.0.1:8000/docs 。
+- 首页：`http://127.0.0.1:8000`
+- API 文档：`http://127.0.0.1:8000/docs`
 
-## 使用 MySQL
+## 数据库配置
 
-默认是 SQLite。要切换 MySQL，有两种方式：
+默认数据库是 SQLite。可通过环境变量切到 MySQL。
 
-1) 直接提供完整 URL（优先级最高）：
+### 方式一：直接指定完整 URL（优先级最高）
 
 ```bash
 export ZIYUANKU_DATABASE_URL="mysql+pymysql://root:password@127.0.0.1:3306/ziyuanku?charset=utf8mb4"
 ```
 
-2) 用分项环境变量（系统会自动拼接 URL）：
+### 方式二：分项变量拼接
 
 ```bash
 export ZIYUANKU_MYSQL_HOST=127.0.0.1
@@ -39,31 +40,14 @@ export ZIYUANKU_MYSQL_DB=ziyuanku
 export ZIYUANKU_MYSQL_CHARSET=utf8mb4
 ```
 
-然后正常启动：
-
-```bash
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-也可以直接用脚本启动（默认 root@127.0.0.1:3306/ziyuanku）：
-
-```bash
-cd backend
-./run_backend_mysql.sh
-```
-
 ### SQLite 迁移到 MySQL
-
-项目内置迁移脚本（按表复制数据，默认先清空目标 MySQL）：
 
 ```bash
 cd backend
 python3 migrate_sqlite_to_mysql.py
 ```
 
-可选：
+可选参数：
 
 ```bash
 # 指定源 sqlite 文件
@@ -76,90 +60,94 @@ python3 migrate_sqlite_to_mysql.py --target-url "mysql+pymysql://root:pass@127.0
 python3 migrate_sqlite_to_mysql.py --keep-target-data
 ```
 
-## 入库接口示例
+## 核心能力
+
+### 1) 资源入库（`/api/resources`）
+
+- 支持单条 / 批量入库。
+- 去重依据：`file_hash`（若未提供，会按 `file_path` 文件内容计算 SHA-256）。
+- 支持批量发送：`POST /api/resources/batch-send`。
+
+示例：
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/resources \
   -H "Content-Type: application/json" \
-  -d '{"file_path":"/abs/path/a.jpg","media_type":"image","source_account":"vitagennn","caption":"..."}'
+  -d '{"file_path":"/abs/path/a.jpg","media_type":"image","source_account":"demo","caption":"..."}'
 ```
 
-- 传了 `file_hash` 就直接用；没传则服务端按 `file_path` 的文件内容计算 SHA-256。
-- 支持单条对象，也支持对象数组批量入库。
+### 2) 视频库（`/api/videos`）
 
-## 视频入库接口
+- 入库去重：优先按 `code`，否则按 `source_url`。
+- 支持下载状态上报、批量改状态、批量分类、批量导出 CSV、回收站删除/恢复/彻底删除。
+- 支持封面处理：单条补封面、批量补封面、单条去水印、批量去水印（后台任务 + 状态查询）。
 
-爬虫抓完后调 `POST /api/videos`，按 **code（番号）** 或 **source_url（详情页链接）** 去重。
+示例：
 
 ```bash
-# 单条（字段名兼容 twav_videos.json）
+# 单条
 curl -X POST http://127.0.0.1:8000/api/videos \
   -H "Content-Type: application/json" \
-  -d '{"title":"TWAV-D001 ...","code":"TWAV-D001","url":"https://missav.ai/...","cover":"https://.../cover-t.jpg","duration":"12:34"}'
+  -d '{"title":"TWAV-D001","code":"TWAV-D001","url":"https://missav.ai/...","cover":"https://.../cover.jpg"}'
 
-# 批量：JSON 数组
+# 批量
 curl -X POST http://127.0.0.1:8000/api/videos \
   -H "Content-Type: application/json" \
   -d @twav_videos.json
 ```
 
-可选字段：`video_url`（m3u8 流地址）、`file_path`（本地下载路径）、`source`（来源站点，默认 `missav`）、`extra`（其它元数据）。
+### 3) 分类能力（`/api/video-categories`）
 
-列表：`GET /api/videos?source=missav`；详情：`GET /api/videos/{id}`。
+- 分类树查询、同步预设分类、新增/编辑/删除分类。
+- 视频与分类绑定、解绑、覆盖设置。
 
-下载状态上报（供下载器回调）：
+### 4) 本地媒体同步（`/api/sync/local`）
 
-```bash
-curl -X PATCH http://127.0.0.1:8000/api/videos/1/download \
-  -H "Content-Type: application/json" \
-  -d '{"download_status":"downloading"}'
-# 完成后：download_status=done, file_path=/abs/path/video.mp4
-```
-
-后台页面：**概览**、**资源库**（视频列表与预览）、**爬虫脚本**（管理页 `/scripts`）。`/videos` 已合并到 `/resources`。
-
-### 爬虫脚本管理
-
-- 启动后台时会自动把 `scrapers/` 预设命令同步到数据库（见 `app/services/script_registry.py`）。
-- 打开 http://127.0.0.1:8000/scripts ：可**同步内置脚本**、**登记/编辑/停用/删除**、**运行**并查看日志。
-- 同一脚本不允许并发运行；下载类命令超时 24 小时，列表爬虫 30 分钟。
-- **分类**：左侧可添加/删除分类，点击筛选脚本；登记脚本时可选择分类。
-- API：`GET/POST /api/script-categories`、`GET/POST /api/scripts`、`POST /api/scripts/sync`、`PATCH/DELETE /api/scripts/{id}`、`POST /api/scripts/{id}/run`。
-
-## 本地数据同步（已下载文件 + 脚本登记）
-
-扫描仓库 `data/` 目录，把 IG 图片/视频入库到 `resources`，MissAV/Pornhub 的 mp4 入库到 `videos`，并把 `scrapers/` 下脚本登记到后台：
+扫描仓库 `data/`，将本地媒体同步到数据库（当前包含 MissAV/Pornhub 视频源）。
 
 ```bash
 cd backend
 python3 sync_local.py
-# 或 API：curl -X POST http://127.0.0.1:8000/api/sync/local
+# 或 API
+curl -X POST http://127.0.0.1:8000/api/sync/local
 ```
 
-目录约定：`data/instagram/`、`data/missav/`、`data/pornhub/`；元数据 JSON 在 `data/metadata/`。
+## 页面路由
 
-## 批量发送（剪片对接）
+- `/`：概览
+- `/resources`：资源库（含回收站、批量操作）
+- `/browse`：分类浏览
+- `/category-editor`：分类编辑
 
-`POST /api/resources/batch-send`，请求体 `{"resource_ids":[1,2,3]}`。
+`/videos` 已重定向到 `/resources`。
 
-> ⚠️ 下游剪片接口文档尚未提供。当前为 **stub**：未配置 `ZIYUANKU_DISPATCH_ENDPOINT` 时，
-> 仅把资源状态推进到「已发送切片」并记日志，让后台按钮即刻可用。
-> 文档到位后，在 `app/services/dispatch.py` 的 `_build_payload` 补齐字段、
-> 设置环境变量 `ZIYUANKU_DISPATCH_ENDPOINT`（及可选 `ZIYUANKU_DISPATCH_TOKEN`）即可切到真实调用，无需改动其它代码。
+## 下游剪片接口（stub 说明）
 
-## 目录
+`POST /api/resources/batch-send` 已预留真实对接位。  
+未配置 `ZIYUANKU_DISPATCH_ENDPOINT` 时，走 stub：仅推进资源状态并记录日志。  
+文档到位后，在 `app/services/dispatch.py` 补齐 payload 并配置环境变量即可切换真实调用。
 
-```
+## 目录结构
+
+```text
 backend/app/
-  config.py        # 配置（数据目录、剪片接口地址等，可用环境变量覆盖）
-  database.py      # 引擎/会话/建表
-  models.py        # Resource / CrawlScript / CrawlRun + 状态机
-  schemas.py       # Pydantic
-  crud.py          # 读写 + 去重
+  config.py
+  database.py
+  models.py
+  schemas.py
+  crud.py
+  routers/
+    pages.py
+    resources.py
+    videos.py
+    video_categories.py
+    sync.py
+    media.py
   services/
-    dispatch.py    # 批量发送去剪片（接口对接位）
-    crawler_runner.py  # 子进程运行爬虫脚本
-  routers/         # resources / scripts / pages
-  templates/       # 服务端渲染页面
-  static/          # css + js
+    dispatch.py
+    local_sync.py
+    cover_gen.py
+    watermark.py
+  templates/
+  static/
 ```

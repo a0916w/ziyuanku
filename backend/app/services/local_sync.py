@@ -1,4 +1,4 @@
-"""扫描本地 data/ 目录，把已下载媒体和爬虫脚本同步进数据库。"""
+"""扫描本地 data/ 目录，把已下载媒体同步进数据库。"""
 from __future__ import annotations
 
 import json

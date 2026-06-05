@@ -49,16 +49,6 @@ def _migrate_sqlite_columns():
             for sql in alters:
                 conn.execute(text(sql))
 
-    if "crawl_scripts" in insp.get_table_names():
-        script_cols = {c["name"] for c in insp.get_columns("crawl_scripts")}
-        if "category_id" not in script_cols:
-            with engine.begin() as conn:
-                conn.execute(text(
-                    "ALTER TABLE crawl_scripts ADD COLUMN category_id INTEGER "
-                    "REFERENCES script_categories(id)"
-                ))
-
-
 def init_db():
     """建表（MVP 阶段用 create_all，后续如需迁移再上 Alembic）。"""
     migrate_legacy_database()

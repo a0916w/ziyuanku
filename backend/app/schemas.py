@@ -111,34 +111,6 @@ class VideoIngestResult(BaseModel):
     ids: list[int]
 
 
-class ScriptCategoryIn(BaseModel):
-    name: str = Field(..., min_length=1, max_length=128)
-    description: Optional[str] = None
-    sort_order: int = 0
-
-
-class ScriptCategoryUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=128)
-    description: Optional[str] = None
-    sort_order: Optional[int] = None
-
-
-class ScriptIn(BaseModel):
-    name: str
-    command: str
-    description: Optional[str] = None
-    category_id: Optional[int] = None
-    enabled: bool = True
-
-
-class ScriptUpdate(BaseModel):
-    name: Optional[str] = None
-    command: Optional[str] = None
-    description: Optional[str] = None
-    category_id: Optional[int] = None
-    enabled: Optional[bool] = None
-
-
 class VideoCategoryOut(BaseModel):
     id: int
     name: str

@@ -44,6 +44,13 @@
 - `.gitignore` 增加后台运行时数据（`backend/data/`、`*.db`）排除规则。
 
 ### Changed
+- 清理爬虫下线后的残留实现：
+  - 删除后端 `models`/`schemas`/`crud` 中已不再使用的脚本管理模型与读写逻辑。
+  - 删除前端 `app.js` 中失效的 `/api/scripts`、`/api/browser`、`/api/runs` 调用代码块。
+  - 移除 `backend/requirements.txt` 中爬虫残留依赖（`beautifulsoup4`、重复的 `playwright`）。
+- 重写 `backend/README.md`，与当前实际能力对齐（资源/视频/分类/同步/分发），并移除已下线脚本管理内容。
+
+### Changed
 - 为兼容 MySQL `utf8mb4` 索引长度限制，将 `videos.source_url` 列长度从 `1024` 调整为 `512`（仍保留索引）。
 - 记录已确认的关键决策（2026-06-05）于 `资源库需求.md`：
   - 批量分发：通过下游接口发送，后台以按钮触发（接口文档待提供，先留对接位）。
