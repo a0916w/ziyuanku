@@ -55,9 +55,8 @@ def find_m3u8(page, video_url: str, timeout_ms: int = 12000) -> str | None:
                 "checking your browser",
                 "just a moment",
                 "cf-chl",
-                "cloudflare",
                 "请稍候",
-                "验证",
+                "verify you are human",
             )
         ):
             raise RuntimeError("页面仍在验证或被 403 拦截，请先在后台验证浏览器中完成验证。")

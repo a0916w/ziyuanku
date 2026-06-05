@@ -62,8 +62,11 @@ def is_blocked_page(html: str) -> bool:
     return any(
         marker in text
         for marker in (
-            "checking your browser", "just a moment", "cf-chl",
-            "cloudflare", "verify you are human", "请稍候", "验证",
+            "checking your browser",
+            "just a moment",
+            "cf-chl",
+            "verify you are human",
+            "请稍候",
         )
     )
 
