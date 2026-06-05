@@ -5,7 +5,7 @@
 
 <section class="cards">
   {% for s in dl_order %}
-  <a class="card" href="/resources?download_status={{ s }}">
+  <a class="card" href="/videos?download_status={{ s }}">
     <div class="card-num">{{ dl_counts[s] }}</div>
     <div class="card-label">{{ dl_labels[s] }}</div>
   </a>
@@ -14,19 +14,19 @@
 
 <div class="filters">
   <span class="muted">视图：</span>
-  <a class="chip {{ 'on' if not trash_only }}" href="/resources{{ '?source=' ~ current_source if current_source else '' }}{{ '&download_status=' ~ current_dl_status if current_dl_status and current_source else ('?download_status=' ~ current_dl_status if current_dl_status and not current_source else '') }}{{ '&keyword=' ~ current_keyword if current_keyword and (current_source or current_dl_status) else ('?keyword=' ~ current_keyword if current_keyword and not (current_source or current_dl_status) else '') }}">资源库</a>
-  <a class="chip {{ 'on' if trash_only }}" href="/resources?trash=1{{ '&source=' ~ current_source if current_source else '' }}{{ '&download_status=' ~ current_dl_status if current_dl_status else '' }}{{ '&keyword=' ~ current_keyword if current_keyword else '' }}">回收站</a>
+  <a class="chip {{ 'on' if not trash_only }}" href="/videos{{ '?source=' ~ current_source if current_source else '' }}{{ '&download_status=' ~ current_dl_status if current_dl_status and current_source else ('?download_status=' ~ current_dl_status if current_dl_status and not current_source else '') }}{{ '&keyword=' ~ current_keyword if current_keyword and (current_source or current_dl_status) else ('?keyword=' ~ current_keyword if current_keyword and not (current_source or current_dl_status) else '') }}">资源库</a>
+  <a class="chip {{ 'on' if trash_only }}" href="/videos?trash=1{{ '&source=' ~ current_source if current_source else '' }}{{ '&download_status=' ~ current_dl_status if current_dl_status else '' }}{{ '&keyword=' ~ current_keyword if current_keyword else '' }}">回收站</a>
 </div>
 
 <div class="filters">
-  <form class="search-form" method="get" action="/resources">
+  <form class="search-form" method="get" action="/videos">
     {% if trash_only %}<input type="hidden" name="trash" value="1">{% endif %}
     {% if current_source %}<input type="hidden" name="source" value="{{ current_source }}">{% endif %}
     {% if current_dl_status %}<input type="hidden" name="download_status" value="{{ current_dl_status }}">{% endif %}
     <input name="keyword" value="{{ current_keyword }}" placeholder="搜索标题/番号/链接" />
     <button type="submit">搜索</button>
     {% if current_keyword %}
-    <a class="chip" href="/resources{% if current_source or current_dl_status %}?{% endif %}{% if current_source %}source={{ current_source }}{% endif %}{% if current_source and current_dl_status %}&{% endif %}{% if current_dl_status %}download_status={{ current_dl_status }}{% endif %}">清空</a>
+    <a class="chip" href="/videos{% if current_source or current_dl_status %}?{% endif %}{% if current_source %}source={{ current_source }}{% endif %}{% if current_source and current_dl_status %}&{% endif %}{% if current_dl_status %}download_status={{ current_dl_status }}{% endif %}">清空</a>
     {% endif %}
   </form>
   <input id="preset-name" placeholder="筛选方案名" style="min-width:140px">
@@ -38,16 +38,16 @@
 
 <div class="filters">
   <span class="muted">来源：</span>
-  <a class="chip {{ 'on' if not current_source }}" href="/resources{{ '?download_status=' ~ current_dl_status if current_dl_status else '' }}{{ '&keyword=' ~ current_keyword if current_keyword and current_dl_status else ('?keyword=' ~ current_keyword if current_keyword and not current_dl_status else '') }}">全部</a>
-  <a class="chip {{ 'on' if current_source=='missav' }}" href="/resources?source=missav{{ '&download_status=' ~ current_dl_status if current_dl_status else '' }}{{ '&keyword=' ~ current_keyword if current_keyword else '' }}">MissAV</a>
-  <a class="chip {{ 'on' if current_source=='pornhub' }}" href="/resources?source=pornhub{{ '&download_status=' ~ current_dl_status if current_dl_status else '' }}{{ '&keyword=' ~ current_keyword if current_keyword else '' }}">Pornhub</a>
+  <a class="chip {{ 'on' if not current_source }}" href="/videos{{ '?download_status=' ~ current_dl_status if current_dl_status else '' }}{{ '&keyword=' ~ current_keyword if current_keyword and current_dl_status else ('?keyword=' ~ current_keyword if current_keyword and not current_dl_status else '') }}">全部</a>
+  <a class="chip {{ 'on' if current_source=='missav' }}" href="/videos?source=missav{{ '&download_status=' ~ current_dl_status if current_dl_status else '' }}{{ '&keyword=' ~ current_keyword if current_keyword else '' }}">MissAV</a>
+  <a class="chip {{ 'on' if current_source=='pornhub' }}" href="/videos?source=pornhub{{ '&download_status=' ~ current_dl_status if current_dl_status else '' }}{{ '&keyword=' ~ current_keyword if current_keyword else '' }}">Pornhub</a>
 </div>
 
 <div class="filters">
   <span class="muted">状态：</span>
-  <a class="chip {{ 'on' if not current_dl_status }}" href="/resources{{ '?source=' ~ current_source if current_source else '' }}{{ '&keyword=' ~ current_keyword if current_keyword and current_source else ('?keyword=' ~ current_keyword if current_keyword and not current_source else '') }}">全部</a>
+  <a class="chip {{ 'on' if not current_dl_status }}" href="/videos{{ '?source=' ~ current_source if current_source else '' }}{{ '&keyword=' ~ current_keyword if current_keyword and current_source else ('?keyword=' ~ current_keyword if current_keyword and not current_source else '') }}">全部</a>
   {% for s in dl_order %}
-  <a class="chip {{ 'on' if current_dl_status==s }}" href="/resources?download_status={{ s }}{{ '&source=' ~ current_source if current_source else '' }}{{ '&keyword=' ~ current_keyword if current_keyword else '' }}">{{ dl_labels[s] }}</a>
+  <a class="chip {{ 'on' if current_dl_status==s }}" href="/videos?download_status={{ s }}{{ '&source=' ~ current_source if current_source else '' }}{{ '&keyword=' ~ current_keyword if current_keyword else '' }}">{{ dl_labels[s] }}</a>
   {% endfor %}
 </div>
 

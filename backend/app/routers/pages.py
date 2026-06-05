@@ -68,10 +68,10 @@ def _resources_url(page: int = 1, *, download_status: str | None = None,
         params["keyword"] = keyword
     if trash_only:
         params["trash"] = 1
-    return "/resources?" + urlencode(params)
+    return "/videos?" + urlencode(params)
 
 
-@router.get("/resources", response_class=HTMLResponse, summary="资源库（视频）")
+@router.get("/videos", response_class=HTMLResponse, summary="视频库")
 def resources_page(request: Request, page: int = 1,
                    download_status: str | None = None,
                    source: str | None = None,
@@ -121,14 +121,14 @@ def resources_page(request: Request, page: int = 1,
     })
 
 
-@router.get("/videos", include_in_schema=False)
-def videos_redirect(download_status: str | None = None, source: str | None = None):
+@router.get("/resources", include_in_schema=False)
+def resources_redirect(download_status: str | None = None, source: str | None = None):
     q = []
     if download_status:
         q.append(f"download_status={download_status}")
     if source:
         q.append(f"source={source}")
-    url = "/resources" + (f"?{'&'.join(q)}" if q else "")
+    url = "/videos" + (f"?{'&'.join(q)}" if q else "")
     return RedirectResponse(url, status_code=301)
 
 

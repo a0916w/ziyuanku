@@ -7,10 +7,10 @@
   <span class="muted">扫描已下载视频并更新资源库</span>
 </p>
 
-<h2>资源库 <a class="section-link" href="/resources">查看全部 →</a></h2>
+<h2>视频库 <a class="section-link" href="/videos">查看全部 →</a></h2>
 <section class="cards">
   {% for s in dl_order %}
-  <a class="card" href="/resources?download_status={{ s }}">
+  <a class="card" href="/videos?download_status={{ s }}">
     <div class="card-num">{{ dl_counts[s] }}</div>
     <div class="card-label">{{ dl_labels[s] }}</div>
   </a>

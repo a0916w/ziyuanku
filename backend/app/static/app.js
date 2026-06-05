@@ -576,7 +576,7 @@
     const items = read();
     if (idx < 0 || !items[idx]) return;
     const q = items[idx].query || {};
-    const u = new URL(location.origin + "/resources");
+    const u = new URL(location.origin + "/videos");
     Object.entries(q).forEach(([k, v]) => { if (v) u.searchParams.set(k, String(v)); });
     location.href = u.toString();
   });

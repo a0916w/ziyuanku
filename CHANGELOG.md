@@ -16,6 +16,7 @@
   - 数据库删除 `resources` 表。
 
 ### Changed
+- 视频库页面路由由 `/resources` 改名为 `/videos`（导航、首页、筛选方案等链接同步更新）；保留 `/resources → /videos` 的隐藏重定向，旧链接不失效。
 - 后端数据库改为仅支持 MySQL：
   - 移除 `backend/app/config.py` 中 SQLite 回退与本地 SQLite 自动迁移逻辑。
   - 移除 `backend/app/database.py` 中 SQLite 专用建表补丁逻辑。
