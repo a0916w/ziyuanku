@@ -5,6 +5,13 @@
 
 ## [Unreleased]
 
+### Changed
+- 后端数据库改为仅支持 MySQL：
+  - 移除 `backend/app/config.py` 中 SQLite 回退与本地 SQLite 自动迁移逻辑。
+  - 移除 `backend/app/database.py` 中 SQLite 专用建表补丁逻辑。
+  - 删除 `backend/migrate_sqlite_to_mysql.py` 迁移脚本。
+  - 更新 `backend/README.md` 数据库说明为 MySQL-only。
+
 ### Added
 - 下线爬虫模块：
   - 前台移除“爬虫脚本”导航与概览中的脚本运行区块。

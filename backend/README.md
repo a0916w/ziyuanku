@@ -21,7 +21,7 @@ uvicorn app.main:app --reload
 
 ## 数据库配置
 
-默认数据库是 SQLite。可通过环境变量切到 MySQL。
+仅支持 MySQL（`mysql+pymysql://`）。
 
 ### 方式一：直接指定完整 URL（优先级最高）
 
@@ -40,25 +40,7 @@ export ZIYUANKU_MYSQL_DB=ziyuanku
 export ZIYUANKU_MYSQL_CHARSET=utf8mb4
 ```
 
-### SQLite 迁移到 MySQL
-
-```bash
-cd backend
-python3 migrate_sqlite_to_mysql.py
-```
-
-可选参数：
-
-```bash
-# 指定源 sqlite 文件
-python3 migrate_sqlite_to_mysql.py --source-sqlite /abs/path/ziyuanku.db
-
-# 指定目标 mysql url
-python3 migrate_sqlite_to_mysql.py --target-url "mysql+pymysql://root:pass@127.0.0.1:3306/ziyuanku?charset=utf8mb4"
-
-# 保留目标库已有数据（不清空）
-python3 migrate_sqlite_to_mysql.py --keep-target-data
-```
+启动前需确保 MySQL 已创建目标库并可连接。
 
 ## 核心能力
 

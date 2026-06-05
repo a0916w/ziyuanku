@@ -1,7 +1,5 @@
 """集中配置。可用环境变量覆盖。"""
 import os
-import shutil
-import sqlite3
 from pathlib import Path
 from urllib.parse import quote_plus
 
@@ -14,9 +12,6 @@ REPO_ROOT = BASE_DIR.parent
 DATA_DIR = Path(os.getenv("ZIYUANKU_DATA_DIR", REPO_ROOT / "data"))
 FILES_DIR = Path(os.getenv("ZIYUANKU_FILES_DIR", DATA_DIR))
 MEDIA_DIR = Path(os.getenv("ZIYUANKU_MEDIA_DIR", DATA_DIR / "media"))
-
-DB_PATH = DATA_DIR / "ziyuanku.db"
-
 
 def _build_mysql_url_from_env() -> str | None:
     """从环境变量构建 MySQL URL（mysql+pymysql://...）。"""
@@ -37,39 +32,16 @@ def _build_mysql_url_from_env() -> str | None:
 DATABASE_URL = (
     os.getenv("ZIYUANKU_DATABASE_URL")
     or _build_mysql_url_from_env()
-    or f"sqlite:///{DB_PATH}"
 )
-
-# 旧版数据库位置（backend/data/），启动时自动迁移到 DATA_DIR
-LEGACY_DB_PATH = BASE_DIR / "data" / "ziyuanku.db"
+if not DATABASE_URL:
+    raise RuntimeError(
+        "未配置数据库连接。请设置 ZIYUANKU_DATABASE_URL，或提供 ZIYUANKU_MYSQL_* 环境变量。"
+    )
+if not DATABASE_URL.startswith("mysql+pymysql://"):
+    raise RuntimeError("仅支持 MySQL（mysql+pymysql://）。请检查数据库配置。")
 
 DISPATCH_ENDPOINT = os.getenv("ZIYUANKU_DISPATCH_ENDPOINT", "")
 DISPATCH_TOKEN = os.getenv("ZIYUANKU_DISPATCH_TOKEN", "")
-
-
-def _db_resource_count(path: Path) -> int:
-    if not path.is_file():
-        return 0
-    try:
-        con = sqlite3.connect(str(path))
-        row = con.execute(
-            "SELECT COUNT(*) FROM resources"
-        ).fetchone()
-        con.close()
-        return int(row[0]) if row else 0
-    except sqlite3.Error:
-        return 0
-
-
-def migrate_legacy_database() -> bool:
-    """仅当 data/ziyuanku.db 尚不存在时，从 backend/data/ 迁移一次。"""
-    legacy = LEGACY_DB_PATH.resolve()
-    target = DB_PATH.resolve()
-    if legacy == target or not legacy.is_file() or target.is_file():
-        return False
-    target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(legacy, target)
-    return True
 
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
