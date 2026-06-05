@@ -69,7 +69,7 @@ if [[ -z "${VNC_PASSWORD:-}" ]]; then
   if [[ -s "$VNC_PASSWORD_FILE" ]]; then
     VNC_PASSWORD="$(head -n 1 "$VNC_PASSWORD_FILE")"
   else
-    VNC_PASSWORD="$(python3 -c 'import secrets,string; chars=string.ascii_letters+string.digits; print("".join(secrets.choice(chars) for _ in range(10)))')"
+    VNC_PASSWORD="$(python3 -c 'import secrets,string; chars=string.ascii_letters+string.digits; print("".join(secrets.choice(chars) for _ in range(8)))')"
     printf '%s\n' "$VNC_PASSWORD" > "$VNC_PASSWORD_FILE"
     chmod 600 "$VNC_PASSWORD_FILE"
   fi
@@ -81,7 +81,7 @@ printf '%s\n' "$VNC_PASSWORD" | vncpasswd -f > "$VNC_AUTH_FILE"
 chmod 600 "$VNC_AUTH_FILE"
 
 if ! port_open 127.0.0.1 "$VNC_PORT"; then
-  vncserver ":${DISPLAY_NUM}" -localhost yes -geometry "$VNC_GEOMETRY" -depth "$VNC_DEPTH" >"$LOG_DIR/vnc-start.log" 2>&1
+  vncserver ":${DISPLAY_NUM}" -localhost yes -geometry "$VNC_GEOMETRY" -depth "$VNC_DEPTH" -SecurityTypes None -UseBlacklist 0 >"$LOG_DIR/vnc-start.log" 2>&1
 fi
 if ! port_open 127.0.0.1 "$VNC_PORT"; then
   echo "VNC server did not start on 127.0.0.1:${VNC_PORT}. Check $LOG_DIR/vnc-start.log" >&2

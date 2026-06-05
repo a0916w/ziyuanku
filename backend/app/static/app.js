@@ -63,10 +63,9 @@
     pill.className = "status " + (ok ? "status-dl-done" : "status-dl-failed");
     pill.textContent = ok ? "CDP 可用" : "未启动";
     novnc.href = data.novnc_url || "#";
-    if (data.novnc_url && data.vnc_password) {
+    if (data.novnc_url) {
       const link = new URL(data.novnc_url, window.location.origin);
-      link.searchParams.set("autoconnect", "true");
-      link.searchParams.set("password", data.vnc_password);
+      link.searchParams.set("autoconnect", "1");
       novnc.href = link.toString();
     }
     if (data.vnc_password) {
@@ -123,7 +122,10 @@
   openBtn.addEventListener("click", async () => {
     setBusy(openBtn, "打开中…");
     try {
-      render(await postJson("/api/browser/open-tab", { url: targetUrl() }));
+      const data = await postJson("/api/browser/open-tab", { url: targetUrl() });
+      render(data);
+      const title = data.tab?.title || data.tab?.url || targetUrl();
+      alert("已在验证浏览器打开 Tab：" + title);
     } catch (err) {
       alert("打开失败：" + err.message);
     } finally {

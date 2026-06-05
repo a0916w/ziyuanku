@@ -181,6 +181,12 @@ def open_tab(url: str) -> dict:
             resp = requests.get(f"{CDP_URL}/json/new?{quote(url, safe='')}", timeout=5)
         resp.raise_for_status()
         tab = resp.json()
+        tab_id = tab.get("id")
+        if tab_id:
+            try:
+                requests.get(f"{CDP_URL}/json/activate/{tab_id}", timeout=3)
+            except Exception:
+                pass
         return {"ok": True, "tab": tab, **status().as_dict()}
     except Exception as exc:  # noqa: BLE001
         raise RuntimeError(f"打开 tab 失败：{exc}") from exc
