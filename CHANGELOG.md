@@ -6,6 +6,10 @@
 ## [Unreleased]
 
 ### Added
+- 新增本机推送脚本 `scrapers/push_to_server.py`：在本机跑爬虫（住宅 IP + 真实浏览器可过 MissAV 的 Cloudflare），把产出的视频 JSON 批量推送到线上 `POST /api/videos` 入库（按 code/source_url 去重）。
+  - 直接兼容爬虫 JSON 字段（`url`/`cover`），支持 `--source` 指定来源、basic auth（`--user`/`--password` 或环境变量 `ZIYUANKU_PUSH_PASSWORD`）、`--batch-size` 分批、`--dry-run` 预演。
+  - 默认剥掉本机绝对路径字段（`cover_path`/`file_path`，服务器上无意义），可用 `--keep-local-paths` 保留。
+  - 说明：因服务器机房 IP 无法通过 MissAV 的 Cloudflare 验证，采集改为「本机执行 → 推送线上入库」。
 - 爬虫板块加回「验证浏览器（VNC）」会话，用于让 MissAV 过 Cloudflare：
   - 恢复 `services/browser_session.py`、`routers/browser.py`（`/api/browser/status|start|open-tab|check-verified|stop`）、`scripts/start-browser-session.sh`、`scripts/stop-browser-session.sh`。
   - 脚本页恢复「验证浏览器」面板与对应前端逻辑（启动/打开 Tab/检查验证/停止 + noVNC 链接与 VNC 密码展示）；MissAV 运行前校验 CDP 是否就绪。
