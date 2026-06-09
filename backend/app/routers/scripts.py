@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from .. import crud, models
 from ..database import get_db
 from ..schemas import ScriptIn, ScriptUpdate
+from ..services import browser_session
 from ..services.crawler_runner import start_run
 from ..services.script_registry import sync_registered_scripts
 
@@ -95,6 +96,8 @@ def run_script(script_id: int, db: Session = Depends(get_db)):
         raise HTTPException(400, "脚本已停用")
     if crud.script_is_running(db, script_id):
         raise HTTPException(409, "该脚本已在运行中")
+    if browser_session.command_requires_cdp(s.command) and not browser_session.status().cdp_available:
+        raise HTTPException(409, "该脚本需要验证浏览器。请先在页面上启动验证浏览器并完成验证。")
     run = start_run(db, s)
     return {"run_id": run.id, "status": run.status}
 

@@ -6,6 +6,11 @@
 ## [Unreleased]
 
 ### Added
+- 爬虫板块加回「验证浏览器（VNC）」会话，用于让 MissAV 过 Cloudflare：
+  - 恢复 `services/browser_session.py`、`routers/browser.py`（`/api/browser/status|start|open-tab|check-verified|stop`）、`scripts/start-browser-session.sh`、`scripts/stop-browser-session.sh`。
+  - 脚本页恢复「验证浏览器」面板与对应前端逻辑（启动/打开 Tab/检查验证/停止 + noVNC 链接与 VNC 密码展示）；MissAV 运行前校验 CDP 是否就绪。
+  - MissAV 内置命令改回经 `--cdp-url http://127.0.0.1:9222` 复用验证浏览器；`scrapers/missav_*` 增加 `CRAWLER_HEADLESS` 开关与 Cloudflare 等待重试。
+  - 说明：经实测该服务器机房 IP 下，纯无头/有头+xvfb 自动化均无法通过 MissAV 的 Cloudflare 交互验证，需经 noVNC 人工验证一次后复用会话。
 - 重新加入「爬虫脚本」板块（轻量版，不含浏览器 VNC 会话）：
   - 新增脚本管理后台页 `/scripts` 与导航入口，支持脚本分类、登记/编辑/启停/删除、一键运行、运行日志查看与运行记录，运行中页面自动刷新。
   - 新增 API：`/api/scripts`（增删改查/同步/运行/运行记录）、`/api/script-categories`（分类增删改查）、`/api/runs/recent`（最近运行轮询）。

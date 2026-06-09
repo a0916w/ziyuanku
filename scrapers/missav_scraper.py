@@ -15,6 +15,8 @@ BASE_URL = "https://missav.ai"
 START_URL = "https://missav.ai/dm31/en/twav"
 DEFAULT_OUTPUT = str(REPO_ROOT / "data" / "metadata" / "twav_videos.json")
 DEFAULT_CDP_URL = os.getenv("CRAWLER_CDP_URL", "")
+# 无界面默认开启；设 CRAWLER_HEADLESS=0 可走有头模式（配合 xvfb-run 过 Cloudflare 验证）
+HEADLESS = os.getenv("CRAWLER_HEADLESS", "1") != "0"
 
 
 def parse_video_list(soup):
@@ -71,6 +73,27 @@ def is_blocked_page(html: str) -> bool:
     )
 
 
+def wait_past_challenge(page, ready_selector: str | None = None, timeout_ms: int = 45000) -> str:
+    """等待 Cloudflare「正在验证」挑战自动通过（有头 + xvfb 下通常可过）。
+
+    每隔几秒重新读取页面，直到不再是验证页或出现目标元素；超时则返回最后一次 HTML。
+    """
+    deadline = time.time() + timeout_ms / 1000
+    html = page.content()
+    while time.time() < deadline:
+        html = page.content()
+        if not is_blocked_page(html):
+            if ready_selector:
+                try:
+                    page.wait_for_selector(ready_selector, timeout=8000)
+                    html = page.content()
+                except Exception:
+                    pass
+            return html
+        page.wait_for_timeout(3000)
+    return html
+
+
 def main(max_pages=10, save_to=DEFAULT_OUTPUT, start_url=START_URL, cdp_url=DEFAULT_CDP_URL):
     all_videos = []
     with sync_playwright() as p:
@@ -79,7 +102,7 @@ def main(max_pages=10, save_to=DEFAULT_OUTPUT, start_url=START_URL, cdp_url=DEFA
             browser = p.chromium.connect_over_cdp(cdp_url)
             context = browser.contexts[0] if browser.contexts else browser.new_context()
         else:
-            browser = p.chromium.launch(headless=True, args=["--disable-blink-features=AutomationControlled"])
+            browser = p.chromium.launch(headless=HEADLESS, args=["--disable-blink-features=AutomationControlled"])
             context = browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
                 locale="zh-CN",
@@ -97,10 +120,11 @@ def main(max_pages=10, save_to=DEFAULT_OUTPUT, start_url=START_URL, cdp_url=DEFA
                 page.wait_for_load_state("networkidle", timeout=10000)
             except Exception:
                 pass
-            html = page.content()
+            html = wait_past_challenge(page, ready_selector="div.thumbnail.group")
             if is_blocked_page(html):
-                raise RuntimeError("页面仍在验证或被拦截，请在浏览器完成验证后重试。")
-            page.wait_for_selector("div.thumbnail.group", timeout=15000)
+                raise RuntimeError(
+                    "页面仍在验证或被拦截。建议以有头模式运行（xvfb-run + CRAWLER_HEADLESS=0）"
+                )
             soup = BeautifulSoup(html, "html.parser")
             videos = parse_video_list(soup)
             all_videos.extend(videos)

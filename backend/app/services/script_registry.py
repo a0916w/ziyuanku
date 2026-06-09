@@ -21,7 +21,7 @@ REGISTERED_SCRIPTS: list[dict] = [
             "--cdp-url http://127.0.0.1:9222 "
             "--max-pages 10 -o data/metadata/twav_videos.json"
         ),
-        "description": "抓取 MissAV 列表元数据 → data/metadata/twav_videos.json（需自备可访问的浏览器 CDP）",
+        "description": "复用验证浏览器（CDP）抓取 MissAV 列表元数据 → data/metadata/twav_videos.json",
         "kind": "scrape",
         "category": "MissAV",
     },
@@ -32,7 +32,7 @@ REGISTERED_SCRIPTS: list[dict] = [
             "-i data/metadata/twav_videos.json -o data/missav/twav "
             "--cdp-url http://127.0.0.1:9222"
         ),
-        "description": "从 JSON 获取 m3u8 并下载 MissAV 视频 → data/missav/twav",
+        "description": "复用验证浏览器（CDP）截获 m3u8，再用 ffmpeg 下载 MissAV 视频 → data/missav/twav",
         "kind": "download",
         "category": "MissAV",
     },
