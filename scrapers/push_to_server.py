@@ -67,6 +67,60 @@ def chunked(seq: list, size: int):
         yield seq[i:i + size]
 
 
+class PushError(RuntimeError):
+    """推送过程中的可识别错误,带退出码,便于 CLI 与上层调用统一处理。"""
+
+    def __init__(self, message: str, exit_code: int):
+        super().__init__(message)
+        self.exit_code = exit_code
+
+
+def push_items(
+    items: list[dict],
+    *,
+    server: str = DEFAULT_SERVER,
+    user: str = DEFAULT_USER,
+    password: str,
+    batch_size: int = 100,
+    insecure: bool = False,
+    log=print,
+) -> tuple[int, int]:
+    """把已规整好的 items 分批 POST 到 {server}/api/videos,返回 (created, duplicated)。
+
+    items 必须是 normalize() 已处理过的列表(每条带 source/source_url/title)。
+    用于 downloader 等下游脚本直接复用,无需写中转 JSON。
+    """
+    if not items:
+        return (0, 0)
+    if not password:
+        raise PushError("密码为空,无法推送(请设 ZIYUANKU_PUSH_PASSWORD 或显式传入)", 3)
+
+    url = server.rstrip("/") + "/api/videos"
+    auth = (user, password)
+    total_created = total_dup = 0
+    for idx, batch in enumerate(chunked(items, batch_size), 1):
+        try:
+            resp = requests.post(
+                url, json=batch, auth=auth, timeout=60, verify=not insecure,
+            )
+        except requests.RequestException as e:
+            raise PushError(f"[批 {idx}] 请求失败:{e}", 2) from e
+        if resp.status_code == 401:
+            raise PushError("鉴权失败(401):用户名或密码不对", 3)
+        if not resp.ok:
+            raise PushError(
+                f"[批 {idx}] 入库失败 HTTP {resp.status_code}:{resp.text[:300]}", 4
+            )
+        data = resp.json()
+        total_created += data.get("created", 0)
+        total_dup += data.get("duplicated", 0)
+        log(
+            f"[批 {idx}] 本批 {len(batch)} 条 → 新增 {data.get('created', 0)},"
+            f"重复 {data.get('duplicated', 0)}"
+        )
+    return total_created, total_dup
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="把本机爬虫 JSON 推送到线上入库接口")
     parser.add_argument("json_file", help="爬虫输出的视频 JSON 文件")
@@ -103,33 +157,22 @@ def main() -> int:
 
     password = args.password
     if not password:
-        password = getpass.getpass(f"{args.user}@{args.server} 的密码：")
+        password = getpass.getpass(f"{args.user}@{args.server} 的密码:")
 
-    url = args.server.rstrip("/") + "/api/videos"
-    auth = (args.user, password)
-    total_created = total_dup = 0
+    try:
+        total_created, total_dup = push_items(
+            items,
+            server=args.server,
+            user=args.user,
+            password=password,
+            batch_size=args.batch_size,
+            insecure=args.insecure,
+        )
+    except PushError as e:
+        print(f"[错误] {e}", file=sys.stderr)
+        return e.exit_code
 
-    for idx, batch in enumerate(chunked(items, args.batch_size), 1):
-        try:
-            resp = requests.post(
-                url, json=batch, auth=auth, timeout=60,
-                verify=not args.insecure,
-            )
-        except requests.RequestException as e:
-            print(f"[批 {idx}] 请求失败：{e}", file=sys.stderr)
-            return 2
-        if resp.status_code == 401:
-            print("[错误] 鉴权失败（401）：用户名或密码不对。", file=sys.stderr)
-            return 3
-        if not resp.ok:
-            print(f"[批 {idx}] 入库失败 HTTP {resp.status_code}：{resp.text[:300]}", file=sys.stderr)
-            return 4
-        data = resp.json()
-        total_created += data.get("created", 0)
-        total_dup += data.get("duplicated", 0)
-        print(f"[批 {idx}] 本批 {len(batch)} 条 → 新增 {data.get('created', 0)}，重复 {data.get('duplicated', 0)}")
-
-    print(f"\n完成：共新增 {total_created} 条，重复（已存在）{total_dup} 条。")
+    print(f"\n完成:共新增 {total_created} 条,重复(已存在){total_dup} 条。")
     return 0
 
 

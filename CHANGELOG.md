@@ -5,6 +5,10 @@
 
 ## [Unreleased]
 
+### Added
+- `scrapers/theporny_downloader.py` 新增 `--push` 一键推送线上入库:下载完成后把成功条目映射成入库 item,直接调用 `/api/videos` 批量入库,**无需写中转 JSON、无需再单独跑 `push_to_server.py`**。密码读环境变量 `ZIYUANKU_PUSH_PASSWORD`(免交互);缺密码时立即报错退出,不会阻塞等待 — 适合无人值守 cron / 后台脚本板块。配套参数:`--push-server` / `--push-user` / `--push-batch-size` / `--push-insecure`。
+- `scrapers/push_to_server.py` 抽出可复用的 `push_items(items, *, server, user, password, ...)` 函数与 `PushError` 异常,CLI 行为对外完全兼容;`theporny_downloader.py` 等下游脚本可直接 import 复用推送逻辑。
+
 ### Fixed
 - 修复 `scrapers/theporny_downloader.py` 下载的 mp4 在 macOS Finder/QuickTime 与浏览器中"打不开"的问题:ffmpeg 合并 m3u8 时把 `moov` 原子留到了文件末尾(非 fast-start),播放器读不到索引就放弃。ffmpeg 命令补 `-movflags +faststart`,`moov` 改放到 `ftyp` 之后、`mdat` 之前,既能秒开也能边下边播。同步对 `data/theporny/` 下已有 mp4(`GQiBF6DGwU.mp4`、`ZszdKvYgw.mp4`)做了一次零损耗 remux,布局已转为 fast-start。
 

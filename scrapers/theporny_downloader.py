@@ -15,11 +15,16 @@
 
     # 只要封面+信息,不下视频
     python3 scrapers/theporny_downloader.py --ids GQiBF6DGwU --no-video
+
+    # 下载后顺便推送线上入库(免交互,密码读环境变量)
+    ZIYUANKU_PUSH_PASSWORD=xxxx python3 scrapers/theporny_downloader.py \\
+        --from-json data/metadata/theporny_c0.json --limit 50 --push
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -28,6 +33,9 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from theporny_scraper import SITE, HEADERS, fetch_detail  # noqa: E402
+from push_to_server import (  # noqa: E402
+    DEFAULT_SERVER, DEFAULT_USER, PushError, normalize, push_items,
+)
 
 # 始终输出到仓库根的 data/theporny,与其它爬虫一致(不受运行目录影响)
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -79,13 +87,41 @@ def download_video(m3u8: str, out_dir: Path, vid: str) -> str | None:
     return str(dest)
 
 
-def process(vid: str, with_video: bool) -> bool:
+def detail_to_item(detail: dict) -> dict | None:
+    """把详情接口返回的 dict 映射成入库 item(字段对齐 theporny_scraper.to_item)。"""
+    vid = detail.get("vId") or detail.get("id")
+    if not vid:
+        return None
+    thumbs = detail.get("thumbnails") or detail.get("thumbNails") or []
+    cover = thumbs[0] if thumbs else None
+    tags = [t.strip() for t in (detail.get("keywords_gem") or "").split(",") if t.strip()]
+    return {
+        "title": detail.get("title") or detail.get("title_en") or vid,
+        "code": vid,
+        "url": f"{SITE}/video/{vid}",
+        "cover": cover,
+        "duration": detail.get("durationStr") or "",
+        "source": "theporny",
+        "extra": {
+            "title_en": detail.get("title_en"),
+            "user": detail.get("user"),
+            "views": detail.get("views"),
+            "size": detail.get("size"),
+            "time": detail.get("time"),
+            "video_type": detail.get("videoType"),
+            "tags": tags,
+        },
+    }
+
+
+def process(vid: str, with_video: bool) -> tuple[bool, dict | None]:
+    """返回 (是否成功, 入库 item dict 或 None)。"""
     print(f"[{vid}] 抓详情…")
     try:
         detail = fetch_detail(vid)
     except RuntimeError as e:
         print(f"    [失败] {e}", file=sys.stderr)
-        return False
+        return False, None
 
     out_dir = OUT_ROOT / vid
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -108,8 +144,8 @@ def process(vid: str, with_video: bool) -> bool:
                 size_mb = Path(path).stat().st_size / 1024 / 1024
                 print(f"    视频已保存:{path}（{size_mb:.1f} MB）")
             else:
-                return False
-    return True
+                return False, None
+    return True, detail_to_item(detail)
 
 
 def collect_ids(args) -> list[str]:
@@ -131,7 +167,22 @@ def main() -> int:
     parser.add_argument("--from-json", help="从列表 JSON(theporny_scraper 产出)读取 id")
     parser.add_argument("--limit", type=int, help="配合 --from-json,只取前 N 个")
     parser.add_argument("--no-video", action="store_true", help="只下封面+信息,不下视频")
+    parser.add_argument("--push", action="store_true",
+                        help="下载完顺便推送到线上 /api/videos 入库(免交互)")
+    parser.add_argument("--push-server", default=DEFAULT_SERVER,
+                        help=f"推送目标服务器,默认 {DEFAULT_SERVER}")
+    parser.add_argument("--push-user", default=DEFAULT_USER,
+                        help=f"推送 basic auth 用户名,默认 {DEFAULT_USER}")
+    parser.add_argument("--push-batch-size", type=int, default=100,
+                        help="推送分批大小,默认 100")
+    parser.add_argument("--push-insecure", action="store_true",
+                        help="推送时跳过 TLS 证书校验(自签时用)")
     args = parser.parse_args()
+
+    if args.push and not os.getenv("ZIYUANKU_PUSH_PASSWORD"):
+        print("[错误] --push 需要在环境变量 ZIYUANKU_PUSH_PASSWORD 里提供密码",
+              file=sys.stderr)
+        return 1
 
     ids = collect_ids(args)
     if not ids:
@@ -139,11 +190,37 @@ def main() -> int:
         return 1
 
     ok = 0
+    items: list[dict] = []
     for vid in ids:
-        if process(vid, with_video=not args.no_video):
+        success, item = process(vid, with_video=not args.no_video)
+        if success:
             ok += 1
+            if item:
+                norm = normalize(item, "theporny", keep_local=False)
+                if norm:
+                    items.append(norm)
         print()
     print(f"完成:成功 {ok}/{len(ids)} 部，输出目录 {OUT_ROOT}/")
+
+    if args.push:
+        if not items:
+            print("[推送] 无可推送条目,跳过")
+        else:
+            print(f"[推送] 准备向 {args.push_server} 推送 {len(items)} 条…")
+            try:
+                created, dup = push_items(
+                    items,
+                    server=args.push_server,
+                    user=args.push_user,
+                    password=os.getenv("ZIYUANKU_PUSH_PASSWORD", ""),
+                    batch_size=args.push_batch_size,
+                    insecure=args.push_insecure,
+                )
+            except PushError as e:
+                print(f"[推送失败] {e}", file=sys.stderr)
+                return e.exit_code
+            print(f"[推送] 完成:新增 {created} 条,重复 {dup} 条")
+
     return 0 if ok else 2
 
 
