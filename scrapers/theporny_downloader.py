@@ -63,10 +63,13 @@ def download_video(m3u8: str, out_dir: Path, vid: str) -> str | None:
     if dest.exists() and dest.stat().st_size > 0:
         print(f"    视频已存在,跳过:{dest}")
         return str(dest)
+    # -movflags +faststart 把 moov 原子放到文件开头,
+    # 否则 macOS QuickTime/Finder 与浏览器无法边下边播,常表现为"打不开"。
     cmd = [
         "ffmpeg", "-y", "-loglevel", "warning", "-stats",
         "-headers", f"Referer: {SITE}/\r\nUser-Agent: {HEADERS['User-Agent']}\r\n",
         "-i", m3u8, "-c", "copy", "-bsf:a", "aac_adtstoasc",
+        "-movflags", "+faststart",
         str(dest),
     ]
     proc = subprocess.run(cmd)
