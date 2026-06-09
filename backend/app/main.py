@@ -16,7 +16,8 @@ from pathlib import Path
 from .config import FILES_DIR
 from .database import SessionLocal, init_db
 from .routers import (
-    video_categories, pages, videos, sync, media
+    video_categories, pages, videos, sync, media,
+    scripts, script_categories, runs,
 )
 from .services.content_category_registry import sync_default_categories
 
@@ -55,6 +56,9 @@ app.include_router(media.router)
 app.include_router(videos.router)
 app.include_router(sync.router)
 app.include_router(video_categories.router)
+app.include_router(scripts.router)
+app.include_router(script_categories.router)
+app.include_router(runs.router)
 
 
 @app.get("/health", tags=["meta"], include_in_schema=False)

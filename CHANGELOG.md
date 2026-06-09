@@ -5,6 +5,13 @@
 
 ## [Unreleased]
 
+### Added
+- 重新加入「爬虫脚本」板块（轻量版，不含浏览器 VNC 会话）：
+  - 新增脚本管理后台页 `/scripts` 与导航入口，支持脚本分类、登记/编辑/启停/删除、一键运行、运行日志查看与运行记录，运行中页面自动刷新。
+  - 新增 API：`/api/scripts`（增删改查/同步/运行/运行记录）、`/api/script-categories`（分类增删改查）、`/api/runs/recent`（最近运行轮询）。
+  - 恢复模型 `ScriptCategory/CrawlScript/CrawlRun`（表 `script_categories/crawl_scripts/crawl_runs`，由 `create_all` 自动建表）、相关 `crud`、`schemas`，以及 `services/crawler_runner`（子进程后台运行）与 `services/script_registry`（内置脚本登记）。
+  - 恢复 `scrapers/`（missav/pornhub/instagram 采集与下载脚本、`cover_download` 等）及 `beautifulsoup4`、`playwright` 依赖。
+
 ### Removed
 - **[BREAKING]** 完全移除「资源（resources）」模块（仅保留视频 videos）：
   - 删除资源入库/列表/批量发送接口 `POST|GET /api/resources`、`POST /api/resources/batch-send`。

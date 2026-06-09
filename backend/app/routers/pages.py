@@ -234,3 +234,31 @@ def category_editor_page(request: Request, db: Session = Depends(get_db)):
     })
 
 
+@router.get("/scripts", response_class=HTMLResponse, summary="爬虫脚本管理页")
+def scripts_page(
+    request: Request,
+    category_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    categories = crud.list_script_categories(db)
+    category_counts = {
+        c.id: crud.count_scripts_in_category(db, c.id) for c in categories
+    }
+    uncategorized_count = crud.count_uncategorized_scripts(db)
+    scripts = crud.list_scripts(db, category_id=category_id)
+    total_scripts = sum(category_counts.values()) + uncategorized_count
+    recent_runs = crud.list_recent_runs(db, limit=40)
+    return TEMPLATES.TemplateResponse(request, "scripts.html", {
+        "scripts": scripts,
+        "categories": categories,
+        "category_counts": category_counts,
+        "uncategorized_count": uncategorized_count,
+        "total_scripts": total_scripts,
+        "current_category_id": category_id,
+        "recent_runs": recent_runs,
+        "run_labels": models.RUN_STATUS_LABELS,
+        "has_running": crud.has_running_scripts(db),
+        "active": "scripts",
+    })
+
+

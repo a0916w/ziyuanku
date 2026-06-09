@@ -2,11 +2,21 @@
 from datetime import datetime
 
 from sqlalchemy import (
-    Column, Integer, String, Text, DateTime, ForeignKey, JSON, Table,
+    Column, Integer, String, Text, DateTime, ForeignKey, Boolean, JSON, Table,
 )
 from sqlalchemy.orm import relationship
 
 from .database import Base
+
+# 脚本运行状态
+RUN_RUNNING = "running"
+RUN_SUCCESS = "success"
+RUN_FAILED = "failed"
+RUN_STATUS_LABELS = {
+    RUN_RUNNING: "运行中",
+    RUN_SUCCESS: "成功",
+    RUN_FAILED: "失败",
+}
 
 # 视频 ↔ 内容分类（多对多，通常绑定到子分类）
 video_category_map = Table(
@@ -78,3 +88,49 @@ class VideoCategory(Base):
     videos = relationship(
         "Video", secondary=video_category_map, back_populates="content_categories",
     )
+
+
+class ScriptCategory(Base):
+    """爬虫脚本分类（可自定义添加）。"""
+    __tablename__ = "script_categories"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(128), unique=True, nullable=False)
+    description = Column(Text)
+    sort_order = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    scripts = relationship("CrawlScript", back_populates="category")
+
+
+class CrawlScript(Base):
+    """爬虫脚本登记：管理可运行的爬虫脚本。"""
+    __tablename__ = "crawl_scripts"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    # 运行命令（相对仓库根或绝对），例如：python3 scrapers/missav_scraper.py ...
+    command = Column(Text, nullable=False)
+    description = Column(Text)
+    category_id = Column(Integer, ForeignKey("script_categories.id"), index=True)
+    enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    category = relationship("ScriptCategory", back_populates="scripts")
+    runs = relationship("CrawlRun", back_populates="script",
+                        cascade="all, delete-orphan", order_by="desc(CrawlRun.started_at)")
+
+
+class CrawlRun(Base):
+    """一次爬虫运行记录。"""
+    __tablename__ = "crawl_runs"
+
+    id = Column(Integer, primary_key=True)
+    script_id = Column(Integer, ForeignKey("crawl_scripts.id"), nullable=False, index=True)
+    status = Column(String(32), default="running")  # running / success / failed
+    started_at = Column(DateTime, default=datetime.utcnow, index=True)
+    finished_at = Column(DateTime)
+    exit_code = Column(Integer)
+    log = Column(Text)  # stdout + stderr 截断保存
+
+    script = relationship("CrawlScript", back_populates="runs")

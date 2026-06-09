@@ -440,3 +440,200 @@ def remove_video_from_category(db: Session, video_id: int, category_id: int) -> 
     return video
 
 
+# ---- 爬虫运行记录 ----
+
+def list_recent_runs(db: Session, limit: int = 30) -> list[models.CrawlRun]:
+    stmt = (
+        select(models.CrawlRun)
+        .options(joinedload(models.CrawlRun.script))
+        .order_by(models.CrawlRun.started_at.desc())
+        .limit(limit)
+    )
+    return list(db.execute(stmt).scalars().unique().all())
+
+
+def has_running_scripts(db: Session) -> bool:
+    row = db.execute(
+        select(models.CrawlRun.id)
+        .where(models.CrawlRun.status == models.RUN_RUNNING)
+        .limit(1)
+    ).scalar_one_or_none()
+    return row is not None
+
+
+def script_is_running(db: Session, script_id: int) -> bool:
+    row = db.execute(
+        select(models.CrawlRun.id)
+        .where(
+            models.CrawlRun.script_id == script_id,
+            models.CrawlRun.status == models.RUN_RUNNING,
+        )
+        .limit(1)
+    ).scalar_one_or_none()
+    return row is not None
+
+
+# ---- 脚本分类 ----
+
+def list_script_categories(db: Session) -> list[models.ScriptCategory]:
+    stmt = (
+        select(models.ScriptCategory)
+        .order_by(models.ScriptCategory.sort_order, models.ScriptCategory.name)
+    )
+    return list(db.execute(stmt).scalars().all())
+
+
+def get_script_category(db: Session, category_id: int) -> Optional[models.ScriptCategory]:
+    return db.get(models.ScriptCategory, category_id)
+
+
+def get_script_category_by_name(db: Session, name: str) -> Optional[models.ScriptCategory]:
+    return db.execute(
+        select(models.ScriptCategory).where(models.ScriptCategory.name == name)
+    ).scalar_one_or_none()
+
+
+def create_script_category(
+    db: Session, name: str, description: str = None, sort_order: int = 0,
+) -> models.ScriptCategory:
+    cat = models.ScriptCategory(name=name, description=description, sort_order=sort_order)
+    db.add(cat)
+    db.commit()
+    db.refresh(cat)
+    return cat
+
+
+def upsert_script_category(
+    db: Session, name: str, description: str = None, sort_order: int = 0,
+) -> tuple[models.ScriptCategory, bool]:
+    existing = get_script_category_by_name(db, name)
+    if existing:
+        if description is not None:
+            existing.description = description
+        existing.sort_order = sort_order
+        db.commit()
+        db.refresh(existing)
+        return existing, False
+    return create_script_category(db, name, description, sort_order), True
+
+
+def update_script_category(db: Session, category: models.ScriptCategory, **fields) -> models.ScriptCategory:
+    for key, value in fields.items():
+        if value is not None and hasattr(category, key):
+            setattr(category, key, value)
+    db.commit()
+    db.refresh(category)
+    return category
+
+
+def delete_script_category(db: Session, category: models.ScriptCategory) -> None:
+    for script in list(category.scripts):
+        script.category_id = None
+    db.delete(category)
+    db.commit()
+
+
+def count_scripts_in_category(db: Session, category_id: int) -> int:
+    return db.execute(
+        select(func.count()).select_from(models.CrawlScript).where(
+            models.CrawlScript.category_id == category_id
+        )
+    ).scalar_one()
+
+
+def count_uncategorized_scripts(db: Session) -> int:
+    return db.execute(
+        select(func.count()).select_from(models.CrawlScript).where(
+            models.CrawlScript.category_id.is_(None)
+        )
+    ).scalar_one()
+
+
+# ---- 爬虫脚本 ----
+
+def list_scripts(db: Session, category_id: int | None = None):
+    stmt = (
+        select(models.CrawlScript)
+        .options(
+            joinedload(models.CrawlScript.runs),
+            joinedload(models.CrawlScript.category),
+        )
+        .order_by(models.CrawlScript.created_at.desc())
+    )
+    if category_id is not None:
+        stmt = stmt.where(models.CrawlScript.category_id == category_id)
+    return list(db.execute(stmt).scalars().unique().all())
+
+
+def get_script(db: Session, script_id: int) -> Optional[models.CrawlScript]:
+    stmt = (
+        select(models.CrawlScript)
+        .options(
+            joinedload(models.CrawlScript.runs),
+            joinedload(models.CrawlScript.category),
+        )
+        .where(models.CrawlScript.id == script_id)
+    )
+    return db.execute(stmt).scalars().unique().one_or_none()
+
+
+def get_script_by_name(db: Session, name: str) -> Optional[models.CrawlScript]:
+    return db.execute(
+        select(models.CrawlScript).where(models.CrawlScript.name == name)
+    ).scalar_one_or_none()
+
+
+def create_script(
+    db: Session,
+    name: str,
+    command: str,
+    description: str = None,
+    enabled: bool = True,
+    category_id: int | None = None,
+) -> models.CrawlScript:
+    s = models.CrawlScript(
+        name=name, command=command, description=description,
+        enabled=enabled, category_id=category_id,
+    )
+    db.add(s)
+    db.commit()
+    db.refresh(s)
+    return s
+
+
+def upsert_script(
+    db: Session,
+    name: str,
+    command: str,
+    description: str = None,
+    enabled: bool = True,
+    category_id: int | None = None,
+) -> tuple[models.CrawlScript, bool]:
+    """按名称登记脚本。返回 (script, created)。"""
+    existing = get_script_by_name(db, name)
+    if existing:
+        existing.command = command
+        existing.description = description
+        existing.enabled = enabled
+        if category_id is not None:
+            existing.category_id = category_id
+        db.commit()
+        db.refresh(existing)
+        return existing, False
+    return create_script(db, name, command, description, enabled, category_id), True
+
+
+def update_script(db: Session, script: models.CrawlScript, **fields) -> models.CrawlScript:
+    for key, value in fields.items():
+        if hasattr(script, key):
+            setattr(script, key, value)
+    db.commit()
+    db.refresh(script)
+    return script
+
+
+def delete_script(db: Session, script: models.CrawlScript) -> None:
+    db.delete(script)
+    db.commit()
+
+

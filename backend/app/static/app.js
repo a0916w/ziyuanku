@@ -783,3 +783,202 @@
 
   loadUncategorized();
 })();
+
+// ---- 脚本页：同步 / 登记 / 编辑 / 运行 ----
+(function () {
+  const syncBtn = document.getElementById("btn-sync-scripts");
+  if (syncBtn) {
+    syncBtn.addEventListener("click", async () => {
+      syncBtn.disabled = true;
+      syncBtn.textContent = "同步中…";
+      try {
+        const resp = await fetch("/api/scripts/sync", { method: "POST" });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || "同步失败");
+        const cats = data.categories || {};
+        alert(
+          `已同步\n分类：${cats.total ?? 0} 个\n脚本：新增 ${data.created}，更新 ${data.updated}`
+        );
+        location.reload();
+      } catch (err) {
+        alert("同步失败：" + err.message);
+        syncBtn.disabled = false;
+        syncBtn.textContent = "同步内置脚本";
+      }
+    });
+  }
+
+  const catForm = document.getElementById("cat-form");
+  if (catForm) {
+    catForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(catForm);
+      const resp = await fetch("/api/script-categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: fd.get("name"),
+          description: fd.get("description") || null,
+        }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok) location.reload();
+      else alert("添加分类失败：" + (data.detail || ""));
+    });
+  }
+
+  document.querySelectorAll(".cat-del").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("删除该分类？旗下脚本将变为「未分类」。")) return;
+      const resp = await fetch(`/api/script-categories/${btn.dataset.id}`, { method: "DELETE" });
+      if (resp.ok) location.reload();
+      else {
+        const data = await resp.json().catch(() => ({}));
+        alert("删除失败：" + (data.detail || ""));
+      }
+    });
+  });
+
+  const form = document.getElementById("script-form");
+  const formBox = document.getElementById("script-form-box");
+  const formSummary = document.getElementById("form-summary");
+  const formSubmit = document.getElementById("form-submit");
+  const formCancel = document.getElementById("form-cancel");
+
+  function resetForm() {
+    if (!form) return;
+    form.reset();
+    form.id.value = "";
+    form.enabled.checked = true;
+    formSummary.textContent = "+ 登记新脚本";
+    formSubmit.textContent = "保存";
+    formCancel.classList.add("hidden");
+  }
+
+  if (formCancel) formCancel.addEventListener("click", resetForm);
+
+  document.querySelectorAll(".edit-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!form) return;
+      try {
+        const resp = await fetch(`/api/scripts/${btn.dataset.id}`);
+        const sc = await resp.json();
+        if (!resp.ok) throw new Error(sc.detail || "加载失败");
+        formBox.open = true;
+        form.id.value = sc.id;
+        form.name.value = sc.name || "";
+        form.command.value = sc.command || "";
+        form.description.value = sc.description || "";
+        form.enabled.checked = !!sc.enabled;
+        if (form.category_id) {
+          form.category_id.value = sc.category_id != null ? String(sc.category_id) : "";
+        }
+        formSummary.textContent = "编辑脚本";
+        formSubmit.textContent = "更新";
+        formCancel.classList.remove("hidden");
+        form.name.focus();
+      } catch (err) {
+        alert("无法加载脚本：" + err.message);
+      }
+    });
+  });
+
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const catRaw = fd.get("category_id");
+      const body = {
+        name: fd.get("name"),
+        command: fd.get("command"),
+        description: fd.get("description") || null,
+        category_id: catRaw ? Number(catRaw) : null,
+        enabled: fd.get("enabled") === "on",
+      };
+      const editId = fd.get("id");
+      const url = editId ? `/api/scripts/${editId}` : "/api/scripts";
+      const method = editId ? "PATCH" : "POST";
+      const resp = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok) location.reload();
+      else alert("保存失败：" + (data.detail || resp.status));
+    });
+  }
+
+  document.querySelectorAll(".toggle-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const enabled = btn.dataset.enabled !== "1";
+      const resp = await fetch(`/api/scripts/${btn.dataset.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      if (resp.ok) location.reload();
+      else {
+        const data = await resp.json().catch(() => ({}));
+        alert("操作失败：" + (data.detail || ""));
+      }
+    });
+  });
+
+  document.querySelectorAll(".delete-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("确定删除该脚本？运行记录也会一并删除。")) return;
+      const resp = await fetch(`/api/scripts/${btn.dataset.id}`, { method: "DELETE" });
+      if (resp.ok) location.reload();
+      else {
+        const data = await resp.json().catch(() => ({}));
+        alert("删除失败：" + (data.detail || ""));
+      }
+    });
+  });
+
+  document.querySelectorAll(".run-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("在后台启动该脚本？下载任务可能耗时很长。")) return;
+      btn.disabled = true;
+      btn.textContent = "启动中…";
+      const resp = await fetch(`/api/scripts/${btn.dataset.id}/run`, { method: "POST" });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok) {
+        window.__POLL_RUNS__ = true;
+        location.reload();
+      } else {
+        alert("启动失败：" + (data.detail || ""));
+        btn.disabled = false;
+        btn.textContent = "运行";
+      }
+    });
+  });
+})();
+
+// ---- 运行日志展开 ----
+(function () {
+  document.querySelectorAll(".log-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const row = document.getElementById("log-" + btn.dataset.log);
+      if (!row) return;
+      row.classList.toggle("hidden");
+      btn.textContent = row.classList.contains("hidden") ? "查看" : "收起";
+    });
+  });
+})();
+
+// ---- 有脚本运行中时自动刷新页面 ----
+(function () {
+  if (!window.__POLL_RUNS__) return;
+  const interval = setInterval(async () => {
+    try {
+      const resp = await fetch("/api/runs/recent?limit=1");
+      const data = await resp.json();
+      if (!data.has_running) {
+        clearInterval(interval);
+        location.reload();
+      }
+    } catch (_) { /* ignore */ }
+  }, 3000);
+})();
