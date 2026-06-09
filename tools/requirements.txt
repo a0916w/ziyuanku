@@ -1,0 +1,8 @@
+# tools/ 下脚本的依赖（独立于根 / backend，避免把 EasyOCR + PyTorch 这种重依赖塞进后端 venv）
+# 用法：python3 -m pip install -r tools/requirements.txt
+# 系统侧还需要 ffmpeg（macOS: brew install ffmpeg）
+
+opencv-python>=4.9
+numpy>=1.26
+# EasyOCR 会自动拉 torch / torchvision；首次跑会下检测+识别模型到 ~/.EasyOCR/（约 100MB）
+easyocr>=1.7
