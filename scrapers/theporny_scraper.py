@@ -82,6 +82,29 @@ def fetch_page(page: int, vtype: str, timeout: int = 25) -> list[dict]:
     raise RuntimeError(f"第 {page} 页全部主机失败: {last_err}")
 
 
+def fetch_detail(vid: str, timeout: int = 25) -> dict:
+    """抓单个视频详情(含 m3u8 播放地址、封面、完整文字信息)。"""
+    path = f"/sevenVideos/{vid}"
+    body = {"userId": "", "url_search": "", "token": "ufd"}
+    last_err = None
+    for base in API_BASES:
+        try:
+            resp = requests.post(base + path, headers=HEADERS, json=body, timeout=timeout)
+            resp.raise_for_status()
+            r = resp.json().get("r")
+            if not r:
+                last_err = f"{base}: 响应无 r 字段"
+                continue
+            data = json.loads(decrypt(r))
+            if isinstance(data, dict):
+                return data
+            last_err = f"{base}: 解密结果非对象"
+        except Exception as e:  # noqa: BLE001
+            last_err = f"{base}: {e}"
+            continue
+    raise RuntimeError(f"详情 {vid} 全部主机失败: {last_err}")
+
+
 def to_item(v: dict) -> dict | None:
     """把 API 视频对象映射成入库字段。"""
     vid = v.get("vId") or v.get("id")
