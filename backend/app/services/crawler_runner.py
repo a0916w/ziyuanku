@@ -45,9 +45,14 @@ def _run(run_id: int, command: str):
         run = db.get(models.CrawlRun, run_id)
         timeout = command_timeout(command)
         try:
+            # stdin=DEVNULL:防止脚本里调 getpass/input() 时去等 tty,
+            # 后台运行下 stdin 没人喂数据,否则会一直阻塞到超时(默认下载类 24h)。
+            # 改为 DEVNULL 后,这类交互调用会立即 EOF / 抛错 → 当场失败,
+            # 方便发现配置缺失(例如 --push 没设 ZIYUANKU_PUSH_PASSWORD)。
             proc = subprocess.run(
                 _command_args(command),
                 cwd=str(REPO_ROOT),
+                stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
                 timeout=timeout,

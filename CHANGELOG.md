@@ -10,6 +10,7 @@
 - `scrapers/push_to_server.py` 抽出可复用的 `push_items(items, *, server, user, password, ...)` 函数与 `PushError` 异常,CLI 行为对外完全兼容;`theporny_downloader.py` 等下游脚本可直接 import 复用推送逻辑。
 
 ### Fixed
+- `backend/app/services/crawler_runner.py` 子进程 `stdin` 改为 `subprocess.DEVNULL`:之前后台跑爬虫子进程时 stdin 仍指向继承环境,脚本里只要调 `getpass.getpass()` / `input()`(例如旧版 `push_to_server.py`、`ig_downloader.py`),就会一直阻塞到超时(下载类默认 24 小时)才被杀。改为 DEVNULL 后,这类交互调用会立即 EOF / 抛错 → 当场失败、当场暴露,后台脚本板块再也不会因为缺密码挂在那 24 小时。
 - 修复 `scrapers/theporny_downloader.py` 下载的 mp4 在 macOS Finder/QuickTime 与浏览器中"打不开"的问题:ffmpeg 合并 m3u8 时把 `moov` 原子留到了文件末尾(非 fast-start),播放器读不到索引就放弃。ffmpeg 命令补 `-movflags +faststart`,`moov` 改放到 `ftyp` 之后、`mdat` 之前,既能秒开也能边下边播。同步对 `data/theporny/` 下已有 mp4(`GQiBF6DGwU.mp4`、`ZszdKvYgw.mp4`)做了一次零损耗 remux,布局已转为 fast-start。
 
 ### Added
