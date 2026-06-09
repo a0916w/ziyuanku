@@ -6,6 +6,7 @@
 ## [Unreleased]
 
 ### Added
+- 新增 `scrapers/theporny_scraper.py`：theporny.com 视频列表爬虫。该站为 Angular SPA，列表走加密 API（`POST {base}/sevenVideos?page&type` 返回 CryptoJS AES 密文，口令 `xxx`），脚本直接调接口 + openssl 解密，无需浏览器，产出兼容 `push_to_server.py` 的 JSON（含番号/标题/封面/时长/标签）。
 - 新增本机推送脚本 `scrapers/push_to_server.py`：在本机跑爬虫（住宅 IP + 真实浏览器可过 MissAV 的 Cloudflare），把产出的视频 JSON 批量推送到线上 `POST /api/videos` 入库（按 code/source_url 去重）。
   - 直接兼容爬虫 JSON 字段（`url`/`cover`），支持 `--source` 指定来源、basic auth（`--user`/`--password` 或环境变量 `ZIYUANKU_PUSH_PASSWORD`）、`--batch-size` 分批、`--dry-run` 预演。
   - 默认剥掉本机绝对路径字段（`cover_path`/`file_path`，服务器上无意义），可用 `--keep-local-paths` 保留。
