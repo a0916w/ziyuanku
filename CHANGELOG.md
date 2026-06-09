@@ -9,6 +9,7 @@
 - 修复 `scrapers/theporny_downloader.py` 下载的 mp4 在 macOS Finder/QuickTime 与浏览器中"打不开"的问题:ffmpeg 合并 m3u8 时把 `moov` 原子留到了文件末尾(非 fast-start),播放器读不到索引就放弃。ffmpeg 命令补 `-movflags +faststart`,`moov` 改放到 `ftyp` 之后、`mdat` 之前,既能秒开也能边下边播。同步对 `data/theporny/` 下已有 mp4(`GQiBF6DGwU.mp4`、`ZszdKvYgw.mp4`)做了一次零损耗 remux,布局已转为 fast-start。
 
 ### Added
+- 新增 `scrapers/hanime1_scraper.py`：hanime1.me 搜索列表爬虫。该站有 Cloudflare 防护，curl/无头会被 403，脚本用 Playwright **有头** Chrome（住宅 IP 可过 CF）加载搜索页 + BeautifulSoup 解析卡片，产出兼容 `push_to_server.py` 的 JSON（番号/标题/详情链接/封面）。支持 `--genre`/`--start`/`--end` 翻页。
 - 新增 `scrapers/theporny_downloader.py`：theporny.com 视频下载器。调详情接口（`POST /sevenVideos/{id}`，同样 AES 解密）拿到 m3u8 播放地址，用 ffmpeg 下载视频，并保存封面图与完整文字信息到 `data/theporny/{id}/`（`{id}.mp4` / `cover.jpg` / `info.json`）。`theporny_scraper.py` 配套新增 `fetch_detail()`。
 - 新增 `scrapers/theporny_scraper.py`：theporny.com 视频列表爬虫。该站为 Angular SPA，列表走加密 API（`POST {base}/sevenVideos?page&type` 返回 CryptoJS AES 密文，口令 `xxx`），脚本直接调接口 + openssl 解密，无需浏览器，产出兼容 `push_to_server.py` 的 JSON（含番号/标题/封面/时长/标签）。
 - 新增本机推送脚本 `scrapers/push_to_server.py`：在本机跑爬虫（住宅 IP + 真实浏览器可过 MissAV 的 Cloudflare），把产出的视频 JSON 批量推送到线上 `POST /api/videos` 入库（按 code/source_url 去重）。
