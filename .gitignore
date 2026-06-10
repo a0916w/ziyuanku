@@ -8,6 +8,10 @@ cookies.json
 .env
 .env.*
 
+# Telegram (Telethon) 会话文件 —— 含登录态,泄露=别人能登你账号
+*.session
+*.session-journal
+
 # 爬取的媒体产物（体积大、可重生）
 downloads/
 /data/**

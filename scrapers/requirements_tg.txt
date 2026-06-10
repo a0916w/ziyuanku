@@ -1,0 +1,7 @@
+# scrapers/tg_downloader.py 的额外依赖
+# 用法:python3 -m pip install -r scrapers/requirements_tg.txt
+#
+# Telethon 走 MTProto,需要从 https://my.telegram.org 申请 api_id / api_hash;
+# 首次跑会要求交互输入手机号 + 验证码登录,session 文件保存到 ~/.ziyuanku/tg/。
+
+telethon>=1.35
